@@ -2,7 +2,7 @@ requests>=2.32,<3
 pandas>=2.2,<3
 numpy>=1.26,<3
 python-dotenv>=1.0,<2
-scikit-learn>=1.5,<2
+scikit-learn==1.8.0
 finance-datareader>=0.9.90
 pykrx>=1.0.48
 streamlit>=1.40,<2

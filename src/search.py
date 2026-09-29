@@ -38,6 +38,12 @@ EXTRA_US = [
     ("SMCI", "Super Micro Computer", "미국"), ("ARM", "Arm Holdings", "미국"), ("UBER", "Uber", "미국"),
     ("ABNB", "Airbnb", "미국"), ("SHOP", "Shopify", "미국"), ("SNOW", "Snowflake", "미국"),
     ("PANW", "Palo Alto Networks", "미국"), ("CRWD", "CrowdStrike", "미국"),
+    ("CRCL", "Circle Internet Group", "미국"), ("EVGN", "Evogene", "미국"), ("MARA", "MARA Holdings", "미국"),
+    ("RIOT", "Riot Platforms", "미국"), ("CLSK", "CleanSpark", "미국"), ("MSTR", "Strategy", "미국"),
+    ("PYPL", "PayPal", "미국"), ("XYZ", "Block", "미국"), ("NU", "Nu Holdings", "미국"),
+    ("RBLX", "Roblox", "미국"), ("HIMS", "Hims & Hers Health", "미국"), ("ASTS", "AST SpaceMobile", "미국"),
+    ("OKLO", "Oklo", "미국"), ("SMR", "NuScale Power", "미국"), ("QBTS", "D-Wave Quantum", "미국"),
+    ("RGTI", "Rigetti Computing", "미국"), ("TEM", "Tempus AI", "미국"), ("SOUN", "SoundHound AI", "미국"),
     ("SPY", "SPDR S&P 500 ETF", "미국"), ("QQQ", "Invesco QQQ", "미국"), ("SCHD", "Schwab US Dividend ETF", "미국"),
     ("SOXL", "Direxion Semiconductor Bull 3X", "미국"), ("TQQQ", "ProShares UltraPro QQQ", "미국"),
 ]
@@ -60,8 +66,15 @@ KOREAN_ALIASES = {
     "RKLB": ("로켓랩",), "SMCI": ("슈퍼마이크로", "슈마컴"), "ARM": ("암홀딩스", "암"), "UBER": ("우버",),
     "ABNB": ("에어비앤비",), "SHOP": ("쇼피파이",), "SNOW": ("스노우플레이크",), "PANW": ("팔로알토",),
     "CRWD": ("크라우드스트라이크",),
+    "CRCL": ("서클", "서클인터넷", "스테이블코인", "stablecoin"), "EVGN": ("에보진", "이보진", "evogene"),
+    "MARA": ("마라", "마라홀딩스", "비트코인채굴"), "RIOT": ("라이엇", "라이엇플랫폼"), "CLSK": ("클린스파크",),
+    "MSTR": ("스트래티지", "마이크로스트래티지", "비트코인"), "PYPL": ("페이팔", "스테이블코인"),
+    "XYZ": ("블록", "스퀘어"), "NU": ("누홀딩스",), "RBLX": ("로블록스",), "HIMS": ("힘스",),
+    "ASTS": ("AST스페이스모바일", "에이에스티에스"), "OKLO": ("오클로",), "SMR": ("뉴스케일",),
+    "QBTS": ("디웨이브",), "RGTI": ("리게티",), "TEM": ("템퍼스", "템퍼스AI"), "SOUN": ("사운드하운드",),
 }
 
+GLOBAL_SCAN_UNIVERSE = GLOBAL_UNIVERSE + [x for x in EXTRA_US if x[0] not in {"SPY", "QQQ", "SCHD", "SOXL", "TQQQ"}]
 US_STOCKS = GLOBAL_UNIVERSE + EXTRA_US
 US_NAME_MAP = {t: (n, c) for t, n, c in US_STOCKS}
 
@@ -205,3 +218,32 @@ def search_all(query: str, listing: pd.DataFrame, limit: int = 8, known_codes=()
             name, country = US_NAME_MAP.get(tk, (tk, "해외"))
             out.append({"symbol": tk, "name": name, "market": "us", "sub": f"{country} · 티커로 직접 조회", "rank": 9})
     return out[:limit]
+
+
+def search_yahoo(query: str, limit: int = 6) -> list[dict]:
+    """Yahoo Finance 검색 API로 로컬 목록에 없는 해외 종목명/티커를 찾습니다."""
+    q = str(query).strip()
+    if not q:
+        return []
+    try:
+        import requests
+        r = requests.get(
+            "https://query2.finance.yahoo.com/v1/finance/search",
+            params={"q": q, "quotesCount": limit, "newsCount": 0, "enableFuzzyQuery": "true"},
+            headers={"User-Agent": "Mozilla/5.0"}, timeout=8,
+        )
+        r.raise_for_status()
+        out = []
+        allowed = {"EQUITY", "ETF"}
+        for x in r.json().get("quotes", []):
+            if str(x.get("quoteType", "")).upper() not in allowed:
+                continue
+            sym = str(x.get("symbol", "")).upper().strip()
+            if not sym:
+                continue
+            name = str(x.get("longname") or x.get("shortname") or sym)
+            exch = str(x.get("exchange") or x.get("exchDisp") or "해외")
+            out.append({"symbol": sym, "name": name, "market": "us", "sub": f"{exch} · Yahoo 검색", "rank": 7})
+        return out[:limit]
+    except Exception:
+        return []

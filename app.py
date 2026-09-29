@@ -1,4 +1,4 @@
-"""종가매매 AI 스캐너 v8 - 신호표 + 차트 + 종목 리포트 화면 (오늘/전일/2일전/3일전 탭, 통합 검색)."""
+"""종가매매 AI 스캐너 v9 - 신호표 + 차트 + 종목 리포트 화면 (오늘/전일/2일전/3일전 탭, 통합 검색)."""
 from __future__ import annotations
 
 from html import escape
@@ -13,11 +13,11 @@ import streamlit as st
 
 from src.indicators import add_indicators
 from src.model import FEATURES
-from src.search import GLOBAL_UNIVERSE, US_NAME_MAP, load_kr_listing, search_all
+from src.search import GLOBAL_SCAN_UNIVERSE, US_NAME_MAP, load_kr_listing, search_all, search_yahoo
 from src.signals import compute_scored_window, floor_to_tick, pick_signals, target_prices
 from src.toss_client import TossClient
 
-st.set_page_config(page_title="종가매매 AI 스캐너 v8", page_icon="📈", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="종가매매 AI 스캐너 v9", page_icon="📈", layout="wide", initial_sidebar_state="collapsed")
 
 RED, BLUE = "#e0383e", "#2b59d1"          # 한국식: 상승 = 빨강, 하락 = 파랑
 DAY_LABELS = ["오늘", "전일", "2일전", "3일전"]
@@ -274,38 +274,61 @@ def technical_candidate_score(row) -> float:
     return max(0.0, min(100.0, score))
 
 
-def _us_snapshot(symbol: str, name: str, country: str, df: pd.DataFrame):
+def _us_snapshot(symbol: str, name: str, country: str, df: pd.DataFrame, day_offset: int = 0):
     x = add_indicators(df).dropna(subset=["ret_5d", "ret_20d", "volume_ratio", "rsi14", "near_20d_high"]).copy()
-    if x.empty:
+    if len(x) <= day_offset:
         raise ValueError("기술지표 계산에 필요한 데이터가 부족합니다.")
-    row = x.iloc[-1]
-    prev = x.iloc[-2] if len(x) > 1 else row
-    change = (float(row["close"]) / float(prev["close"]) - 1) * 100 if float(prev["close"]) else 0.0
+    idx = len(x) - 1 - day_offset
+    row = x.iloc[idx]
+    prev = x.iloc[max(0, idx - 1)]
     close = float(row["close"])
     d = pd.Timestamp(row["date"])
+    latest = pd.Timestamp(x.iloc[-1]["date"])
+    future = x.iloc[idx + 1:]
+    max_high = float(future["high"].max()) if not future.empty else None
+    last_close = float(x.iloc[-1]["close"])
+    t1, t2 = round(close * 1.10, 2), round(close * 1.20, 2)
+    change = (close / float(prev["close"]) - 1) * 100 if float(prev["close"]) else 0.0
     return {
-        "market": "us", "symbol": symbol, "name": name, "country": country, "date": d, "latest_date": d,
-        "entry_price": close, "last_close": close, "change_pct": change,
+        "market": "us", "symbol": symbol, "name": name, "country": country, "date": d, "latest_date": latest,
+        "day_offset": day_offset, "entry_price": close, "last_close": last_close, "change_pct": change,
         "trading_value": float(row["close"] * row["volume"]), "volume_ratio": float(row["volume_ratio"]),
         "rsi14": float(row["rsi14"]), "ret_5d": float(row["ret_5d"]), "near_20d_high": float(row["near_20d_high"]),
-        "candidate_score": technical_candidate_score(row), "target_1": round(close * 1.10, 2), "target_2": round(close * 1.20, 2),
-        "ret_since": 0.0, "hit_1": False, "hit_2": False, "max_high_after": None, "past": False, "from_table": False,
+        "candidate_score": technical_candidate_score(row), "target_1": t1, "target_2": t2,
+        "ret_since": (last_close / close - 1) * 100, "hit_1": bool(max_high is not None and max_high >= t1),
+        "hit_2": bool(max_high is not None and max_high >= t2), "max_high_after": max_high,
+        "past": day_offset > 0, "from_table": False,
     }
 
 
 @st.cache_data(show_spinner=False, ttl=1800)
 def scan_global_candidates(top_n: int = 14):
+    """해외 유니버스를 한 번만 내려받아 오늘~3일전 후보를 함께 만듭니다."""
+    from concurrent.futures import ThreadPoolExecutor, as_completed
     rows = []
-    for ticker, name, country in GLOBAL_UNIVERSE:
-        try:
-            s = _us_snapshot(ticker, name, country, load_us_chart(ticker, 180))
-            rows.append({k: s[k] for k in ["symbol", "name", "country", "date", "entry_price", "change_pct", "trading_value",
-                                           "volume_ratio", "rsi14", "ret_5d", "near_20d_high", "candidate_score", "target_1", "target_2"]})
-        except Exception:  # noqa: BLE001
-            continue
+    def one(item):
+        ticker, name, country = item
+        df = load_us_chart(ticker, 180)
+        got = []
+        for off in range(4):
+            snap = _us_snapshot(ticker, name, country, df, off)
+            got.append({k: snap[k] for k in ["symbol", "name", "country", "date", "latest_date", "day_offset",
+                "entry_price", "last_close", "change_pct", "trading_value", "volume_ratio", "rsi14", "ret_5d",
+                "near_20d_high", "candidate_score", "target_1", "target_2", "ret_since", "hit_1", "hit_2", "max_high_after"]})
+        return got
+    # 여러 종목을 동시에 받되 워커 수를 제한해 Yahoo 과부하/차단 위험을 낮춥니다.
+    with ThreadPoolExecutor(max_workers=6) as ex:
+        futures = [ex.submit(one, item) for item in GLOBAL_SCAN_UNIVERSE]
+        for fut in as_completed(futures):
+            try:
+                rows.extend(fut.result())
+            except Exception:
+                continue
     if not rows:
         return pd.DataFrame()
-    return pd.DataFrame(rows).sort_values(["candidate_score", "trading_value"], ascending=[False, False]).head(top_n).reset_index(drop=True)
+    z = pd.DataFrame(rows)
+    return (z.sort_values(["day_offset", "candidate_score", "trading_value"], ascending=[True, False, False])
+             .groupby("day_offset", group_keys=False).head(top_n).reset_index(drop=True))
 
 
 def analyze_global_stock(symbol: str):
@@ -324,7 +347,9 @@ def sel_from_us_row(r) -> dict:
         "volume_ratio": float(r["volume_ratio"]), "rsi14": float(r["rsi14"]), "ret_5d": float(r["ret_5d"]),
         "near_20d_high": float(r["near_20d_high"]), "candidate_score": float(r["candidate_score"]),
         "target_1": float(r["target_1"]), "target_2": float(r["target_2"]),
-        "ret_since": 0.0, "hit_1": False, "hit_2": False, "max_high_after": None, "past": False, "from_table": True,
+        "ret_since": float(r.get("ret_since", 0.0)), "hit_1": bool(r.get("hit_1", False)), "hit_2": bool(r.get("hit_2", False)),
+        "max_high_after": r.get("max_high_after", None), "past": int(r.get("day_offset", 0)) > 0, "from_table": True,
+        "latest_date": pd.Timestamp(r.get("latest_date", d)),
     }
 
 
@@ -532,6 +557,15 @@ if q != q_url:
 
 listing = get_listing()
 cands = search_all(q, listing, known_codes=get_known_codes()) if q else []
+if q:
+    # 로컬 사전에 없는 회사명도 Yahoo 검색으로 보완합니다. 단, 정확한 티커 직접입력 결과는 유지합니다.
+    need_web = (not cands) or (len(cands) == 1 and cands[0].get("rank") == 9 and len(q) > 5)
+    if need_web:
+        web_hits = search_yahoo(q)
+        if web_hits:
+            direct = [c for c in cands if c.get("rank") == 9]
+            cands = web_hits + [c for c in direct if c["symbol"] not in {w["symbol"] for w in web_hits}]
+            cands = cands[:8]
 cand_keys = {(c["market"], c["symbol"]) for c in cands}
 search_mode = False
 if q and cands:
@@ -591,24 +625,37 @@ if market == "kr":
         sym = str(first["symbol"])
         sel, chart = sel_from_kr_row(first, latest_date), load_kr_chart(sym)
 else:
-    past = False
+    past = day > 0
     if refresh_us:
-        with st.spinner("미국·일본·유럽 주요 종목을 분석하고 있습니다..."):
+        with st.spinner("해외 종목을 분석하고 오늘~3일전 결과를 저장하고 있습니다..."):
             fresh = scan_global_candidates(top_n)
         if fresh.empty:
             st.error("해외 추천 데이터를 받지 못했습니다.")
         else:
             save_global_candidates(fresh)
-    cand_df = load_saved_global_candidates()
+    all_cand = load_saved_global_candidates()
+    if not all_cand.empty and "day_offset" not in all_cand.columns:
+        all_cand["day_offset"] = 0
+    cand_df = all_cand[all_cand["day_offset"].astype(int) == day].copy() if not all_cand.empty else pd.DataFrame()
     if not cand_df.empty:
         cand_df = cand_df.head(top_n).reset_index(drop=True)
     for r in cand_df.itertuples(index=False):
-        rows.append({"symbol": r.symbol, "name": r.name, "price": r.entry_price, "entry": r.entry_price, "ret": 0.0,
-                     "t1": r.target_1, "t2": r.target_2, "hit1": False, "hit2": False,
+        rows.append({"symbol": r.symbol, "name": r.name, "price": r.last_close if past else r.entry_price,
+                     "entry": r.entry_price, "ret": r.ret_since if past else 0.0,
+                     "t1": r.target_1, "t2": r.target_2, "hit1": bool(r.hit_1), "hit2": bool(r.hit_2),
                      "tag": r.country if r.country != "미국" else ""})
-    panel_title = f'해외 후보 <span class="cnt">{len(rows)}종목</span>'
+    day_date = pd.Timestamp(cand_df.iloc[0]["date"]) if not cand_df.empty else None
+    date_txt = f' <span class="mut">{day_date:%Y%m%d}</span>' if day_date is not None else ""
+    panel_title = f'{DAY_LABELS[day]} 해외 후보{date_txt} <span class="cnt">{len(rows)}종목</span>'
+    panel_tabs = seg([(DAY_LABELS[i], make_link(m="us", d=i, sym="", q="", rep=""), i == day) for i in range(4)])
     if rows:
-        sumline = '<div class="sumline">미국·일본·유럽 주요 종목 · 기술지표 기반 후보 점수 순 (AI 상승확률이 아닙니다)</div>'
+        if past:
+            k1, k2, n_sig = int(cand_df["hit_1"].sum()), int(cand_df["hit_2"].sum()), len(cand_df)
+            avg = float(cand_df["ret_since"].mean())
+            sumline = (f'<div class="sumline">신호일 종가 진입 가정 · 1차 도달 <b>{k1}/{n_sig}</b> · 2차 도달 <b>{k2}/{n_sig}</b> · '
+                       f'현재까지 평균 <b class="{sign_cls(avg)}">{avg:+.1f}%</b></div>')
+        else:
+            sumline = '<div class="sumline">미국·일본·유럽 및 테마 종목 · 기술지표 기반 후보 점수 순 (AI 상승확률이 아닙니다)</div>'
     if sym:
         hit = cand_df[cand_df["symbol"] == sym] if not cand_df.empty else cand_df
         try:
@@ -616,18 +663,18 @@ else:
                 sel, chart = sel_from_us_row(hit.iloc[0]), load_us_chart(sym, 120)
             else:
                 sel, chart = analyze_global_stock(sym)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             err = str(e)
     elif rows:
         first = cand_df.iloc[0]
         sym = str(first["symbol"])
         try:
             sel, chart = sel_from_us_row(first), load_us_chart(sym, 120)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             err = str(e)
 
 # ── 상단 바 마무리 ──────────────────────────────────────────────────────────
-ver_txt = f'v8 · 데이터 기준 {meta["latest_date"]:%Y-%m-%d}' if meta else "v8"
+ver_txt = f'v9 · 데이터 기준 {meta["latest_date"]:%Y-%m-%d}' if meta else "v9"
 c_logo.markdown(f'<span class="logo">📈 종가매매 AI 스캐너</span><span class="ver">{ver_txt}</span>', unsafe_allow_html=True)
 c_mkt.markdown(seg([("🇰🇷 한국", make_link(m="kr", d=0, sym="", q="", rep=""), market == "kr"),
                     ("🌎 해외", make_link(m="us", d=0, sym="", q="", rep=""), market == "us")], css="mkt"), unsafe_allow_html=True)
@@ -649,7 +696,7 @@ with left:
     with st.container(border=True):
         st.markdown(f'<div class="ph"><div class="pt">{panel_title}</div>{panel_tabs}</div>{sumline}', unsafe_allow_html=True)
         if market == "us" and not rows:
-            st.markdown('<div class="empty">아직 저장된 해외 추천이 없습니다.<br>오른쪽 위 <b>🌎 해외 추천 새로 분석</b>을 누르거나, 위 검색창에 NVDA·엔비디아 같은 종목을 검색하세요.</div>',
+            st.markdown('<div class="empty">이 날짜의 저장된 해외 추천이 없습니다.<br>오른쪽 위 <b>🌎 해외 추천 새로 분석</b>을 한 번 누르면 오늘·전일·2일전·3일전 결과가 함께 저장됩니다.<br>검색은 추천 목록과 관계없이 티커·회사명으로 사용할 수 있습니다.</div>',
                         unsafe_allow_html=True)
         else:
             st.markdown(signals_table(rows, market, past, sym) + foot, unsafe_allow_html=True)

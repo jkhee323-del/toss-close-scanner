@@ -6,6 +6,12 @@ import pandas as pd
 def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
     x = df.copy()
 
+    if isinstance(x.columns, pd.MultiIndex):
+        x.columns = x.columns.get_level_values(0)
+
+    x.columns = [str(c).lower() for c in x.columns]
+    x = x.loc[:, ~x.columns.duplicated()]
+    
     x["ret_1d"] = x["close"].pct_change()
     x["ret_5d"] = x["close"].pct_change(5)
     x["ret_20d"] = x["close"].pct_change(20)

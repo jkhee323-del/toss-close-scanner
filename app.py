@@ -132,12 +132,12 @@ def get_known_codes():
     return sorted(p.stem for p in Path("data/history").glob("*.csv"))
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, ttl=15 * 60)
 def get_window():
     return compute_scored_window("data", 4)
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, ttl=15 * 60)
 def load_kr_chart(symbol: str, bars: int = 120):
     p = Path("data/history") / f"{symbol}.csv"
     return pd.read_csv(p, parse_dates=["date"]).sort_values("date").tail(bars).reset_index(drop=True)

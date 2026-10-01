@@ -35,7 +35,7 @@ def metrics(name, prob, frame):
 
 def run():
     # Candidate and all hyperparameters were fixed from 2024 validation before this holdout run.
-    data = build_dataset(DATA_DIR)
+    # The validation module intentionally truncates at 2024-12-31.\n    # For this one-time locked holdout evaluation, extend label availability\n    # without changing the already-selected model, features, or threshold.\n    exp.LABEL_DATA_END = pd.Timestamp("2100-01-01")\n    data = exp.build_dataset(DATA_DIR)
     train = data.loc[data["date"] <= TRAIN_END].copy()
     holdout = data.loc[data["date"] >= HOLDOUT_START].copy()
     if train.empty or holdout.empty:

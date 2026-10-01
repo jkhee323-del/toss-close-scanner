@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier, HistGradientBoostingClassifier
 from sklearn.impute import SimpleImputer
-from sklearn.pipeline import make_pipeline
+from sklearn.pipeline import make_pipeline\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.preprocessing import StandardScaler
 
 from . import next_day_validation_feature_models as exp
 
@@ -61,12 +61,22 @@ def run():
             random_state=RANDOM_STATE,
         ),
     )
+    logistic = make_pipeline(
+        SimpleImputer(strategy="median"),
+        StandardScaler(),
+        LogisticRegression(
+            C=0.1,
+            max_iter=1000,
+            random_state=RANDOM_STATE,
+        ),
+    )
+
     baseline.fit(train[BASE_FEATURES], train["target"].astype(int))
-    candidate.fit(train[EXPANDED_FEATURES], train["target"].astype(int))
+    candidate.fit(train[EXPANDED_FEATURES], train["target"].astype(int))\n    logistic.fit(train[EXPANDED_FEATURES], train["target"].astype(int))
 
     out = pd.DataFrame([
         metrics("HGB baseline", baseline.predict_proba(holdout[BASE_FEATURES])[:, 1], holdout),
-        metrics("RandomForest expanded FIXED", candidate.predict_proba(holdout[EXPANDED_FEATURES])[:, 1], holdout),
+        metrics("RandomForest expanded FIXED", candidate.predict_proba(holdout[EXPANDED_FEATURES])[:, 1], holdout),\n        metrics("LogisticRegression expanded FIXED", logistic.predict_proba(holdout[EXPANDED_FEATURES])[:, 1], holdout),
     ])
     print(f"train={train['date'].min().date()}..{train['date'].max().date()} rows={len(train)}")
     print(f"holdout={holdout['date'].min().date()}..{holdout['date'].max().date()} rows={len(holdout)}")

@@ -1,3 +1,5 @@
+import math
+
 import pandas as pd
 from src.scoring import score_row, display_probability
 
@@ -5,6 +7,24 @@ from src.scoring import score_row, display_probability
 def test_probability_range():
     assert 0 < display_probability(0) < 100
     assert 0 < display_probability(100) < 100
+
+
+def test_nan_inputs_are_safe_and_in_range():
+    row = pd.Series({
+        "ret_5d": float("nan"),
+        "ma5": 105,
+        "ma20": 100,
+        "ma60": 95,
+        "volume_ratio": 2.0,
+        "close_position": 0.9,
+        "near_20d_high": 0.98,
+        "rsi14": 60,
+    })
+    score, parts = score_row(row)
+    assert 0 <= score <= 100
+    assert all(math.isfinite(v) for v in parts.values())
+
+    assert 0 <= display_probability(float("nan")) <= 100
 
 
 def test_score_range():

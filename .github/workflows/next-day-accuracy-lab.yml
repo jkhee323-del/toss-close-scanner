@@ -4,7 +4,8 @@ on:
   push:
     branches: [accuracy-lab]
     paths:
-      - "src/next_day_validation_feature_models.py"\n      - "src/next_day_candidate_holdout.py"
+      - "src/next_day_validation_feature_models.py"
+      - "src/next_day_candidate_holdout.py"
       - ".github/workflows/next-day-accuracy-lab.yml"
   workflow_dispatch:
 
@@ -21,6 +22,8 @@ jobs:
       - run: pip install -r requirements.txt
       - name: Run validation experiment
         run: python -m src.next_day_validation_feature_models
+      - name: Run fixed candidate holdout
+        run: python -m src.next_day_candidate_holdout
       - uses: actions/upload-artifact@v4
         if: always()
         with:

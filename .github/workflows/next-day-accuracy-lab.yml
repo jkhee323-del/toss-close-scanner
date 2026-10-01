@@ -4,7 +4,7 @@ on:
   push:
     branches: [accuracy-lab]
     paths:
-      - "src/next_day_validation_feature_models.py"
+      - "src/next_day_validation_feature_models.py"\n      - "src/next_day_candidate_holdout.py"
       - ".github/workflows/next-day-accuracy-lab.yml"
   workflow_dispatch:
 

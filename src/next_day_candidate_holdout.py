@@ -1,16 +1,19 @@
 from __future__ import annotations
 
-from pathlib import Path
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier, HistGradientBoostingClassifier
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import make_pipeline
 
-from .next_day_validation_feature_models import (
-    build_dataset, DATA_DIR, EXPANDED_FEATURES, BASE_FEATURES,
-    HGB_BASELINE_PARAMS, RANDOM_STATE, PREDICTION_THRESHOLD,
-)
+from . import next_day_validation_feature_models as exp
+
+DATA_DIR = exp.DATA_DIR
+EXPANDED_FEATURES = exp.EXPANDED_FEATURES
+BASE_FEATURES = exp.BASE_FEATURES
+HGB_BASELINE_PARAMS = exp.HGB_BASELINE_PARAMS
+RANDOM_STATE = exp.RANDOM_STATE
+PREDICTION_THRESHOLD = exp.PREDICTION_THRESHOLD
 
 TRAIN_END = pd.Timestamp("2024-12-30")
 HOLDOUT_START = pd.Timestamp("2025-01-02")
@@ -34,8 +37,11 @@ def metrics(name, prob, frame):
 
 
 def run():
-    # Candidate and all hyperparameters were fixed from 2024 validation before this holdout run.
-    # The validation module intentionally truncates at 2024-12-31.\n    # For this one-time locked holdout evaluation, extend label availability\n    # without changing the already-selected model, features, or threshold.\n    exp.LABEL_DATA_END = pd.Timestamp("2100-01-01")\n    data = exp.build_dataset(DATA_DIR)
+    # Locked candidate: features/model/threshold were selected on 2024 validation.
+    # Only widen raw label availability so later dates can be evaluated.
+    exp.LABEL_DATA_END = pd.Timestamp("2100-01-01")
+    data = exp.build_dataset(DATA_DIR)
+
     train = data.loc[data["date"] <= TRAIN_END].copy()
     holdout = data.loc[data["date"] >= HOLDOUT_START].copy()
     if train.empty or holdout.empty:
@@ -57,11 +63,11 @@ def run():
     )
     baseline.fit(train[BASE_FEATURES], train["target"].astype(int))
     candidate.fit(train[EXPANDED_FEATURES], train["target"].astype(int))
-    rows = [
+
+    out = pd.DataFrame([
         metrics("HGB baseline", baseline.predict_proba(holdout[BASE_FEATURES])[:, 1], holdout),
         metrics("RandomForest expanded FIXED", candidate.predict_proba(holdout[EXPANDED_FEATURES])[:, 1], holdout),
-    ]
-    out = pd.DataFrame(rows)
+    ])
     print(f"train={train['date'].min().date()}..{train['date'].max().date()} rows={len(train)}")
     print(f"holdout={holdout['date'].min().date()}..{holdout['date'].max().date()} rows={len(holdout)}")
     print(out.to_string(index=False, float_format=lambda x: f"{x:.4f}"))

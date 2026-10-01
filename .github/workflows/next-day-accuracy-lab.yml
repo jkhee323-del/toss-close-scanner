@@ -1,0 +1,30 @@
+name: Next-day accuracy lab
+
+on:
+  push:
+    branches: [accuracy-lab]
+    paths:
+      - "src/next_day_validation_feature_models.py"
+      - ".github/workflows/next-day-accuracy-lab.yml"
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Run validation experiment
+        run: python -m src.next_day_validation_feature_models
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: next-day-validation-results
+          path: |
+            data/experiments/validation_feature_model_comparison.csv
+            data/experiments/validation_feature_model_comparison.json

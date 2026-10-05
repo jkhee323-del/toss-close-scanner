@@ -20,6 +20,8 @@ jobs:
           python-version: "3.13"
           cache: pip
       - run: pip install -r requirements.txt
+      - name: Run walk-forward candidate search
+        run: python -m src.next_day_walkforward_search
       - name: Run validation experiment
         run: python -m src.next_day_validation_feature_models
       - name: Run fixed candidate holdout
@@ -31,3 +33,4 @@ jobs:
           path: |
             data/experiments/validation_feature_model_comparison.csv
             data/experiments/validation_feature_model_comparison.json
+            data/experiments/next_day_walkforward_search.csv

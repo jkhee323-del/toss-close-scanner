@@ -11,7 +11,7 @@ from sklearn.pipeline import make_pipeline
 from . import next_day_validation_feature_models as exp
 
 
-DEV_END = pd.Timestamp("2100-01-01")
+DEV_END = pd.Timestamp("2024-12-30")
 HORIZONS = [3, 5, 10]
 HISTORY_DIR = Path("data/history")
 

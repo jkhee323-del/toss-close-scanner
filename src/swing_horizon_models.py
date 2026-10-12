@@ -13,6 +13,7 @@ from . import next_day_validation_feature_models as exp
 
 DEV_END = pd.Timestamp("2024-12-30")
 HORIZONS = [3, 5, 10]
+OBV_FEATURES = ["obv_change_5d", "obv_change_20d"]
 HISTORY_DIR = Path("data/history")
 
 FEATURES = exp.BASE_FEATURES + [
@@ -45,7 +46,7 @@ THRESHOLDS = [0.52, 0.54, 0.56, 0.58, 0.60]
 def build_horizon_dataset(horizon: int) -> pd.DataFrame:
     """
     종목별 원본 CSV에서 horizon 거래일 뒤 수익률과 target을 만든다.
-    이후 기존 feature dataset과 날짜 + OHLCV 기준으로 결합한다.
+    이후 기존 feature dataset과 종목 코드 + 날짜 기준으로 결합한다.
     """
     target_frames = []
 
@@ -219,182 +220,184 @@ def run():
             f"target_{horizon}d"
         )
 
-        cached = []
+        for feature_variant, selected_features in (("baseline", FEATURES), ("baseline_plus_obv", FEATURES + OBV_FEATURES)):
+            cached = []
 
-        for (
-            train_end,
-            val_start,
-            val_end,
-        ) in FOLDS:
+            for (
+                train_end,
+                val_start,
+                val_end,
+            ) in FOLDS:
 
-            train_end = pd.Timestamp(
-                train_end
-            )
-
-            val_start = pd.Timestamp(
-                val_start
-            )
-
-            val_end = pd.Timestamp(
-                val_end
-            )
-
-            train = data.loc[
-                data["date"] <= train_end
-            ].copy()
-
-            validation = data.loc[
-                data["date"].between(
-                    val_start,
-                    val_end,
+                train_end = pd.Timestamp(
+                    train_end
                 )
-            ].copy()
 
-            # 라벨 누수 방지:
-            # 학습 마지막 horizon 거래일 제거
-            train_dates = np.sort(
-                train["date"].unique()
-            )
-
-            if len(train_dates) <= horizon:
-                continue
-
-            safe_end = train_dates[
-                -(horizon + 1)
-            ]
-
-            train = train.loc[
-                train["date"] <= safe_end
-            ].copy()
-
-            if (
-                train.empty
-                or validation.empty
-            ):
-                continue
-
-            model = make_pipeline(
-                SimpleImputer(
-                    strategy="median"
-                ),
-                HistGradientBoostingClassifier(
-                    learning_rate=0.035,
-                    max_depth=3,
-                    max_iter=350,
-                    l2_regularization=1.5,
-                    min_samples_leaf=40,
-                    random_state=42,
-                ),
-            )
-
-            model.fit(
-                train[FEATURES],
-                train[
-                    target_col
-                ].astype(int),
-            )
-
-            probability = (
-                model.predict_proba(
-                    validation[FEATURES]
-                )[:, 1]
-            )
-
-            cached.append(
-                (
-                    validation,
-                    probability,
+                val_start = pd.Timestamp(
+                    val_start
                 )
-            )
 
-        for threshold in THRESHOLDS:
-            metrics = [
-                evaluate(
-                    probability,
-                    frame,
-                    threshold,
-                    horizon,
+                val_end = pd.Timestamp(
+                    val_end
                 )
-                for (
-                    frame,
-                    probability,
-                ) in cached
-            ]
 
-            if not metrics:
-                continue
+                train = data.loc[
+                    data["date"] <= train_end
+                ].copy()
 
-            total_signals = sum(
-                m["signals"]
-                for m in metrics
-            )
+                validation = data.loc[
+                    data["date"].between(
+                        val_start,
+                        val_end,
+                    )
+                ].copy()
 
-            if total_signals == 0:
-                continue
-
-            weighted_hit = (
-                sum(
-                    m["hit"]
-                    * m["signals"]
-                    for m in metrics
+                # 라벨 누수 방지:
+                # 학습 마지막 horizon 거래일 제거
+                train_dates = np.sort(
+                    train["date"].unique()
                 )
-                / total_signals
-            )
 
-            weighted_return = (
-                sum(
-                    m["avg_return"]
-                    * m["signals"]
-                    for m in metrics
+                if len(train_dates) <= horizon:
+                    continue
+
+                safe_end = train_dates[
+                    -(horizon + 1)
+                ]
+
+                train = train.loc[
+                    train["date"] <= safe_end
+                ].copy()
+
+                if (
+                    train.empty
+                    or validation.empty
+                ):
+                    continue
+
+                model = make_pipeline(
+                    SimpleImputer(
+                        strategy="median"
+                    ),
+                    HistGradientBoostingClassifier(
+                        learning_rate=0.035,
+                        max_depth=3,
+                        max_iter=350,
+                        l2_regularization=1.5,
+                        min_samples_leaf=40,
+                        random_state=42,
+                    ),
                 )
-                / total_signals
-            )
 
-            min_signals = min(
-                m["signals"]
-                for m in metrics
-            )
+                model.fit(
+                    train[selected_features],
+                    train[
+                        target_col
+                    ].astype(int),
+                )
 
-            min_hit = min(
-                m["hit"]
-                for m in metrics
-            )
+                probability = (
+                    model.predict_proba(
+                        validation[selected_features]
+                    )[:, 1]
+                )
 
-            eligible = (
-                total_signals >= 1500
-                and min_signals >= 250
-            )
+                cached.append(
+                    (
+                        validation,
+                        probability,
+                    )
+                )
 
-            all_results.append(
-                {
-                    "horizon_days":
-                        horizon,
-                    "threshold":
+            for threshold in THRESHOLDS:
+                metrics = [
+                    evaluate(
+                        probability,
+                        frame,
                         threshold,
-                    "eligible":
-                        eligible,
-                    "weighted_hit":
-                        weighted_hit,
-                    "min_fold_hit":
-                        min_hit,
-                    "total_signals":
-                        total_signals,
-                    "min_fold_signals":
-                        min_signals,
-                    "weighted_return_pct":
-                        weighted_return,
-                    "fold_hits":
-                        "|".join(
-                            f"{m['hit']:.2f}"
-                            for m in metrics
-                        ),
-                    "fold_signals":
-                        "|".join(
-                            str(m["signals"])
-                            for m in metrics
-                        ),
-                }
-            )
+                        horizon,
+                    )
+                    for (
+                        frame,
+                        probability,
+                    ) in cached
+                ]
+
+                if not metrics:
+                    continue
+
+                total_signals = sum(
+                    m["signals"]
+                    for m in metrics
+                )
+
+                if total_signals == 0:
+                    continue
+
+                weighted_hit = (
+                    sum(
+                        m["hit"]
+                        * m["signals"]
+                        for m in metrics
+                    )
+                    / total_signals
+                )
+
+                weighted_return = (
+                    sum(
+                        m["avg_return"]
+                        * m["signals"]
+                        for m in metrics
+                    )
+                    / total_signals
+                )
+
+                min_signals = min(
+                    m["signals"]
+                    for m in metrics
+                )
+
+                min_hit = min(
+                    m["hit"]
+                    for m in metrics
+                )
+
+                eligible = (
+                    total_signals >= 1500
+                    and min_signals >= 250
+                )
+
+                all_results.append(
+                    {
+                        "horizon_days":
+                            horizon,
+                        "feature_variant": feature_variant,
+                        "threshold":
+                            threshold,
+                        "eligible":
+                            eligible,
+                        "weighted_hit":
+                            weighted_hit,
+                        "min_fold_hit":
+                            min_hit,
+                        "total_signals":
+                            total_signals,
+                        "min_fold_signals":
+                            min_signals,
+                        "weighted_return_pct":
+                            weighted_return,
+                        "fold_hits":
+                            "|".join(
+                                f"{m['hit']:.2f}"
+                                for m in metrics
+                            ),
+                        "fold_signals":
+                            "|".join(
+                                str(m["signals"])
+                                for m in metrics
+                            ),
+                    }
+                )
 
     results = pd.DataFrame(
         all_results
@@ -461,7 +464,7 @@ def run():
 
     results.to_csv(
         exp.OUTPUT_DIR
-        / "swing_horizon_development.csv",
+        / "swing_horizon_obv_comparison.csv",
         index=False,
         encoding="utf-8-sig",
     )

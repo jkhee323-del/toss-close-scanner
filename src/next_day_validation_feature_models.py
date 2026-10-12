@@ -70,6 +70,7 @@ ENGINEERED_FEATURES = [
 ]
 
 OBV_FEATURES = ["obv_change_5d", "obv_change_20d"]
+FLOW_FEATURES = ["volume_ratio_5d", "log_trading_value", "trading_value_ratio_20d", "obv_change_5d", "obv_change_20d"]
 EXPANDED_FEATURES = BASE_FEATURES + ENGINEERED_FEATURES
 
 TRAIN_END = pd.Timestamp("2023-12-28")
@@ -183,7 +184,7 @@ def build_dataset(data_dir: Path) -> pd.DataFrame:
     data["relative_strength_20d"] = data["ret_20d"] - data["market_return_20d"]
 
     data = data.loc[data["next_date"] <= LABEL_DATA_END].copy()
-    numeric_columns = list(dict.fromkeys(EXPANDED_FEATURES + OBV_FEATURES + ["next_return", "target"]))
+    numeric_columns = list(dict.fromkeys(EXPANDED_FEATURES + OBV_FEATURES + FLOW_FEATURES + ["next_return", "target"]))
     data[numeric_columns] = data[numeric_columns].replace([np.inf, -np.inf], np.nan)
     required_columns = BASE_FEATURES + ["next_return", "target"]
     return data.dropna(subset=required_columns).reset_index(drop=True)
@@ -203,6 +204,10 @@ def get_time_split(data: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
 
 def make_models() -> dict[str, tuple[object, list[str]]]:
     return {
+        "HGB + volume value OBV (experimental)": (
+            make_pipeline(SimpleImputer(strategy="median"), HistGradientBoostingClassifier(**HGB_BASELINE_PARAMS)),
+            BASE_FEATURES + FLOW_FEATURES,
+        ),
         "HGB + OBV (experimental)": (
             make_pipeline(
                 SimpleImputer(strategy="median"),
@@ -325,6 +330,7 @@ def run_validation_experiment(data_dir: Path = DATA_DIR) -> pd.DataFrame:
         "base_features": BASE_FEATURES,
         "engineered_features": ENGINEERED_FEATURES,
         "obv_experimental_features": OBV_FEATURES,
+        "flow_experimental_features": FLOW_FEATURES,
         "minimum_signals_for_candidate": MIN_SIGNALS_FOR_CANDIDATE,
         "train_rows": len(train),
         "train_actual_range": [train["date"].min().date().isoformat(), train["date"].max().date().isoformat()],

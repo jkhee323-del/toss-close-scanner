@@ -14,6 +14,9 @@ from . import next_day_validation_feature_models as exp
 DEV_END = pd.Timestamp("2024-12-30")
 HORIZONS = [3, 5, 10]
 OBV_FEATURES = ["obv_change_5d", "obv_change_20d"]
+# Existing swing baseline already uses volume_ratio_5d and trading_value_ratio_20d.
+# Add non-duplicate liquidity features to test a broader flow hypothesis.
+FLOW_EXTRA_FEATURES = ["volume_change_1d", "log_trading_value", "trading_value_change_5d"]
 HISTORY_DIR = Path("data/history")
 
 FEATURES = exp.BASE_FEATURES + [
@@ -220,7 +223,11 @@ def run():
             f"target_{horizon}d"
         )
 
-        for feature_variant, selected_features in (("baseline", FEATURES), ("baseline_plus_obv", FEATURES + OBV_FEATURES)):
+        for feature_variant, selected_features in (
+            ("baseline", FEATURES),
+            ("baseline_plus_obv", FEATURES + OBV_FEATURES),
+            ("baseline_plus_liquidity_obv", FEATURES + OBV_FEATURES + FLOW_EXTRA_FEATURES),
+        ):
             cached = []
 
             for (

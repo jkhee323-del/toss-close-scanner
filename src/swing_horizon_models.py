@@ -129,66 +129,34 @@ def build_horizon_dataset(horizon: int) -> pd.DataFrame:
         ignore_index=True,
     )
 
-    exp.LABEL_DATA_END = pd.Timestamp("2024-12-31")
+    # Build features only through the development cutoff. Preserve the
+    # caller's configuration and avoid changing global state permanently.
+    old_label_end = exp.LABEL_DATA_END
+    try:
+        exp.LABEL_DATA_END = DEV_END
+        features = exp.build_dataset(exp.DATA_DIR).copy()
+    finally:
+        exp.LABEL_DATA_END = old_label_end
 
-    features = exp.build_dataset(
-        exp.DATA_DIR
-    ).copy()
+    features["date"] = pd.to_datetime(features["date"], errors="coerce")
+    targets["date"] = pd.to_datetime(targets["date"], errors="coerce")
 
-    features["date"] = pd.to_datetime(
-        features["date"],
-        errors="coerce",
-    )
-
-    key_cols = [
-        "date",
-        "open",
-        "high",
-        "low",
-        "close",
-        "volume",
-    ]
-
-    for col in [
-        "open",
-        "high",
-        "low",
-        "close",
-        "volume",
-    ]:
-        features[col] = pd.to_numeric(
-            features[col],
-            errors="coerce",
-        )
-
-        targets[col] = pd.to_numeric(
-            targets[col],
-            errors="coerce",
-        )
+    # Symbol + date is the stock-level identity. OHLCV can coincide
+    # across different symbols and must never be used as a join key.
+    if features.duplicated(["symbol", "date"]).any():
+        raise ValueError("Duplicate symbol/date rows in feature dataset")
+    if targets.duplicated(["symbol", "date"]).any():
+        raise ValueError("Duplicate symbol/date rows in target dataset")
 
     merged = features.merge(
-        targets[
-            key_cols
-            + [
-                "symbol",
-                f"return_{horizon}d",
-                f"target_{horizon}d",
-            ]
-        ],
-        on=key_cols,
+        targets[["symbol", "date", f"return_{horizon}d", f"target_{horizon}d"]],
+        on=["symbol", "date"],
         how="inner",
+        validate="one_to_one",
     )
 
-    merged = merged.loc[
-        merged["date"] <= DEV_END
-    ].copy()
-
-    merged = merged.dropna(
-        subset=[
-            f"return_{horizon}d",
-            f"target_{horizon}d",
-        ]
-    )
+    merged = merged.loc[merged["date"] <= DEV_END].copy()
+    merged = merged.dropna(subset=[f"return_{horizon}d", f"target_{horizon}d"])
 
     print(
         f"{horizon}D dataset: "

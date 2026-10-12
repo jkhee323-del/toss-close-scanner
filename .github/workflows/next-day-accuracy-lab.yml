@@ -8,6 +8,7 @@ on:
       - "src/next_day_candidate_holdout.py"
       - "src/next_day_flow_retrospective.py"
       - "src/next_day_market_liquidity_diagnostics.py"
+      - "src/next_day_fixed_strategy_audit.py"
       - "src/next_day_walkforward_search.py"
       - "src/indicators.py"
       - "src/swing_horizon_models.py"
@@ -39,6 +40,8 @@ jobs:
         run: python -m src.next_day_flow_retrospective
       - name: Diagnose market regimes and liquidity thresholds
         run: python -m src.next_day_market_liquidity_diagnostics
+      - name: Audit fixed strategy costs and drawdowns
+        run: python -m src.next_day_fixed_strategy_audit
       - name: Run fixed candidate holdout
         run: python -m src.next_day_candidate_holdout
       - uses: actions/upload-artifact@v4
@@ -52,3 +55,5 @@ jobs:
             data/experiments/swing_horizon_obv_comparison.csv
             data/experiments/next_day_flow_2025_2026_retrospective.csv
             data/experiments/next_day_market_liquidity_diagnostics.csv
+            data/experiments/next_day_fixed_strategy_audit.csv
+            data/experiments/next_day_fixed_strategy_daily.csv

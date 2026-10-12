@@ -79,6 +79,7 @@ def run():
         raise RuntimeError("No candidate met minimum fold coverage")
     best=eligible.iloc[0]
     print("LOCKED_BEST",best.to_dict())
+    exp.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     out.to_csv(exp.OUTPUT_DIR/"next_day_walkforward_search.csv",index=False)
     return best
 

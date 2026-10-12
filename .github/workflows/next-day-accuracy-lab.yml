@@ -6,6 +6,10 @@ on:
     paths:
       - "src/next_day_validation_feature_models.py"
       - "src/next_day_candidate_holdout.py"
+      - "src/indicators.py"
+      - "src/swing_horizon_models.py"
+      - "tests/test_obv_indicators.py"
+      - "tests/test_obv_swing_data.py"
       - ".github/workflows/next-day-accuracy-lab.yml"
   workflow_dispatch:
 
@@ -20,6 +24,8 @@ jobs:
           python-version: "3.13"
           cache: pip
       - run: pip install -r requirements.txt
+      - name: Run OBV and swing data regression tests
+        run: python -m unittest discover -s tests -p "test_obv*.py" -v
       - name: Run walk-forward candidate search
         run: python -m src.next_day_walkforward_search
       - name: Run validation experiment

@@ -33,6 +33,16 @@ def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
     loss = (-delta.clip(upper=0)).rolling(14).mean()
     rs = gain / loss.replace(0, np.nan)
     x["rsi14"] = 100 - (100 / (1 + rs))
+    # On-Balance Volume (OBV): cumulative signed volume.
+    # Derived only from current and earlier daily closes and volumes.
+    direction = np.sign(x["close"].diff()).fillna(0.0)
+    x["obv"] = (direction * x["volume"].fillna(0)).cumsum()
+    # Normalize OBV changes by typical volume so features are comparable
+    # across stocks; absolute OBV level depends on history start date.
+    typical_volume = x["volume"].rolling(20, min_periods=20).mean().replace(0, np.nan)
+    x["obv_change_5d"] = x["obv"].diff(5) / (typical_volume * 5)
+    x["obv_change_20d"] = x["obv"].diff(20) / (typical_volume * 20)
+
     # 거래대금
     x["trading_value"] = x["close"] * x["volume"]
     x["trading_value_ma20"] = x["trading_value"].rolling(20).mean()

@@ -661,7 +661,10 @@ else:
         all_cand["day_offset"] = 0
     cand_df = all_cand[all_cand["day_offset"].astype(int) == day].copy() if not all_cand.empty else pd.DataFrame()
     if not cand_df.empty:
-        cand_df = cand_df.head(top_n).reset_index(drop=True)
+        cand_df["date"] = pd.to_datetime(cand_df["date"], errors="coerce")
+        cand_df = cand_df.dropna(subset=["date"])
+        # Prefer candidates from the latest available global trading sessions.
+        cand_df = cand_df.sort_values(["date", "candidate_score"], ascending=[False, False]).head(top_n).reset_index(drop=True)
     for r in cand_df.itertuples(index=False):
         rows.append({"symbol": r.symbol, "name": r.name, "price": r.last_close if past else r.entry_price,
                      "entry": r.entry_price, "ret": r.ret_since if past else 0.0,

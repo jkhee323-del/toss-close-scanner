@@ -88,8 +88,18 @@ def _fetch_global(ticker: str) -> pd.DataFrame:
     raw = yf.download(ticker, period="1y", interval="1d", auto_adjust=False, progress=False, threads=False)
     if raw is None or raw.empty:
         raise ValueError("empty Yahoo response")
+
     if isinstance(raw.columns, pd.MultiIndex):
-        raw.columns = [c[0] if isinstance(c, tuple) else c for c in raw.columns]
+        if ticker in raw.columns.get_level_values(-1):
+            raw = raw.xs(ticker, axis=1, level=-1)
+        elif len(raw.columns.get_level_values(-1).unique()) == 1:
+            raw = raw.droplevel(-1, axis=1)
+        else:
+            raise ValueError(f"종목 구분 불가: {ticker}")
+
+    if raw.columns.duplicated().any():
+        raise ValueError(f"중복된 가격 열 발견: {ticker}")
+
     raw = raw.reset_index().rename(columns={"Date": "date", "Open": "open", "High": "high", "Low": "low", "Close": "close", "Volume": "volume"})
     need = ["date", "open", "high", "low", "close", "volume"]
     out = raw[need].copy()

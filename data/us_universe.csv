@@ -1,0 +1,367 @@
+﻿ticker,name,country
+AAPL,Apple,미국
+ABNB,Airbnb,미국
+ADBE,Adobe,미국
+AMD,AMD,미국
+AMZN,Amazon,미국
+ARM,Arm Holdings,미국
+ASTS,AST SpaceMobile,미국
+AVGO,Broadcom,미국
+BA,Boeing,미국
+BRK-B,Berkshire Hathaway B,미국
+CLSK,CleanSpark,미국
+COIN,Coinbase,미국
+COST,Costco,미국
+CRCL,Circle Internet Group,미국
+CRM,Salesforce,미국
+CRWD,CrowdStrike,미국
+DIS,Walt Disney,미국
+EVGN,Evogene,미국
+GOOG,Alphabet (C),미국
+GOOGL,Alphabet,미국
+HIMS,Hims & Hers Health,미국
+HOOD,Robinhood,미국
+INTC,Intel,미국
+IONQ,IonQ,미국
+JPM,JPMorgan Chase,미국
+KO,Coca-Cola,미국
+LLY,Eli Lilly,미국
+MARA,MARA Holdings,미국
+MCD,McDonald's,미국
+META,Meta Platforms,미국
+MSFT,Microsoft,미국
+MSTR,Strategy,미국
+MU,Micron Technology,미국
+NFLX,Netflix,미국
+NKE,Nike,미국
+NU,Nu Holdings,미국
+NVDA,NVIDIA,미국
+OKLO,Oklo,미국
+ORCL,Oracle,미국
+PANW,Palo Alto Networks,미국
+PEP,PepsiCo,미국
+PFE,Pfizer,미국
+PLTR,Palantir,미국
+PYPL,PayPal,미국
+QBTS,D-Wave Quantum,미국
+QCOM,Qualcomm,미국
+RBLX,Roblox,미국
+RGTI,Rigetti Computing,미국
+RIOT,Riot Platforms,미국
+RKLB,Rocket Lab,미국
+SBUX,Starbucks,미국
+SHOP,Shopify,미국
+SMCI,Super Micro Computer,미국
+SMR,NuScale Power,미국
+SNOW,Snowflake,미국
+SOFI,SoFi Technologies,미국
+SOUN,SoundHound AI,미국
+TEM,Tempus AI,미국
+TSLA,Tesla,미국
+TSM,TSMC (ADR),미국
+UBER,Uber,미국
+UNH,UnitedHealth,미국
+V,Visa,미국
+WMT,Walmart,미국
+XOM,Exxon Mobil,미국
+XYZ,Block,미국
+AACG,"ATA Creativity Global - American Depositary Shares, each representing two common shares",미국
+AAL,"American Airlines Group, Inc. - Common Stock",미국
+AAME,Atlantic American Corporation - Common Stock,미국
+AAOI,"Applied Optoelectronics, Inc. - Common Stock",미국
+AAON,"AAON, Inc. - Common Stock",미국
+AAPG,Ascentage Pharma Group International - American Depository Shares,미국
+AARD,"Aardvark Therapeutics, Inc. - Common Stock",미국
+ABAT,American Battery Technology Company - Common Stock,미국
+ABCL,AbCellera Biologics Inc. - Common Shares,미국
+ABEO,Abeona Therapeutics Inc. - Common Stock,미국
+ABLV,Able View Global Inc. - Class B Ordinary Shares,미국
+ABOS,"Acumen Pharmaceuticals, Inc. - Common Stock",미국
+ABSI,Absci Corporation - Common Stock,미국
+ABTC,American Bitcoin Corp. - Class A Common Stock,미국
+ABTS,Abits Group Inc - Ordinary Shares,미국
+ABUS,Arbutus Biopharma Corporation - Common Stock,미국
+ABVC,"ABVC BioPharma, Inc. - Common Stock",미국
+ABVX,Abivax SA - American Depositary Shares,미국
+ACAD,ACADIA Pharmaceuticals Inc. - Common Stock,미국
+ACB,Aurora Cannabis Inc. - Common Shares,미국
+ACCL,Acco Group Holdings Limited - Class A Ordinary Shares,미국
+ACCV,Accelevation Holdings Corp. - Class A ordinary shares,미국
+ACDC,ProFrac Holding Corp. - Class A Common Stock,미국
+ACET,"Adicet Bio, Inc. - Common Stock",미국
+ACFN,"Acorn Energy, Inc. - Common Stock",미국
+ACGL,Arch Capital Group Ltd. - Common Stock,미국
+ACHC,"Acadia Healthcare Company, Inc. - Common Stock",미국
+ACHV,"Achieve Life Sciences, Inc.  - Common Shares",미국
+ACIC,American Coastal Insurance Corporation - Common Stock,미국
+ACIU,AC Immune SA - Common Stock,미국
+ACIW,"ACI Worldwide, Inc. - Common Stock",미국
+ACLS,"Axcelis Technologies, Inc. - Common Stock",미국
+ACMR,"ACM Research, Inc. - Class A Common Stock",미국
+ACNB,ACNB Corporation - Common Stock,미국
+ACNT,Ascent Industries Co. - Common Stock,미국
+ACOG,Alpha Cognition Inc. - Common Stock,미국
+ACON,"Aclarion, Inc. - Common Stock",미국
+ACRS,"Aclaris Therapeutics, Inc. - Common Stock",미국
+ACRV,"Acrivon Therapeutics, Inc. - Common Stock",미국
+ACT,"Enact Holdings, Inc. - Common Stock",미국
+ACTG,Acacia Research Corporation - Common Stock,미국
+ACTU,"Actuate Therapeutics, Inc. - Common stock",미국
+ACXP,"Acurx Pharmaceuticals, Inc. - Common Stock",미국
+ADAG,"Adagene Inc. - ADS, each representing 1.25 ordinary shares",미국
+ADAM,"Adamas Trust, Inc. - Common Stock",미국
+ADAMG,"Adamas Trust, Inc. - 9.125% Senior Notes Due 2030",미국
+ADAMH,"Adamas Trust, Inc. - 9.875% Senior Notes Due 2030",미국
+ADAMI,"Adamas Trust, Inc. - 9.125% Senior Notes Due 2029",미국
+ADAMK,"Adamas Trust, Inc. - 9.600% Senior Notes Due 2031",미국
+ADAMO,"Adamas Trust, Inc. - 9.250% Senior Notes Due 2031",미국
+ADBT,"Advasa Holdings, Inc. - Common stock",미국
+ADEA,Adeia Inc.  - Common Stock,미국
+ADGM,"Adagio Medical Holdings, Inc - Common Stock",미국
+ADI,"Analog Devices, Inc. - Common Stock",미국
+ADIL,"Adial Pharmaceuticals, Inc - Common Stock",미국
+ADMA,ADMA Biologics Inc - Common Stock,미국
+ADP,"Automatic Data Processing, Inc. - Common Stock",미국
+ADPT,Adaptive Biotechnologies Corporation - Common Stock,미국
+ADRX,"ADARx Pharmaceuticals, Inc. - Common stock",미국
+ADSE,ADS-TEC ENERGY PLC - Ordinary Shares,미국
+ADSK,"Autodesk, Inc. - Common Stock",미국
+ADTN,"ADTRAN Holdings, Inc. - Common Stock",미국
+ADUR,Aduro Clean Technologies Inc. - Common Stock,미국
+ADUS,Addus HomeCare Corporation - Common Stock,미국
+ADV,Advantage Solutions Inc.  - Class A Common Stock,미국
+ADVB,Advanced Biomed Inc. - Common Stock,미국
+ADXN,Addex Therapeutics Ltd - American Depositary Shares,미국
+AEBI,Aebi Schmidt Holding AG - Common Stock,미국
+AEC,Anfield Energy Inc. - Common Shares,미국
+AEHL,Antelope Enterprise Holdings Limited - Class A Ordinary Shares,미국
+AEHR,Aehr Test Systems - Common Stock,미국
+AEI,Alset Inc. - Common Stock,미국
+AEIS,"Advanced Energy Industries, Inc. - Common Stock",미국
+AEMD,"Aethlon Medical, Inc. - Common Stock",미국
+AENT,Alliance Entertainment Holding Corporation - common stock,미국
+AEP,"American Electric Power Company, Inc. - Common Stock",미국
+AERT,"Aeries Technology, Inc. - Class A Ordinary Share",미국
+AESP,Aeon Acquisition I Corp. - Class A Ordinary Shares,미국
+AEVA,"Aeva Technologies, Inc. - Common Stock",미국
+AEYE,"AudioEye, Inc. - Common Stock",미국
+AFCG,Advanced Flower Capital Inc. - Common Stock,미국
+AFJK,"Aimei Health Technology Co., Ltd - Ordinary Share",미국
+AFJKR,"Aimei Health Technology Co., Ltd - Right",미국
+AFJKU,"Aimei Health Technology Co., Ltd - Unit",미국
+AFRI,Forafric Global PLC - Ordinary Shares,미국
+AFRM,"Affirm Holdings, Inc. - Class A Common Stock",미국
+AFYA,Afya Limited - Class A Common Shares,미국
+AGCC,Agencia Comercial Spirits Ltd - Class A Ordinary Share,미국
+AGEN,Agenus Inc. - Common Stock,미국
+AGIO,"Agios Pharmaceuticals, Inc. - Common Stock",미국
+AGMB,AgomAb Therapeutics NV - ADRs representing one common share.,미국
+AGMH,AGM Group Holdings Inc. - Class A Ordinary Shares,미국
+AGNC,AGNC Investment Corp. - Common Stock,미국
+AGNT,"AGNT, Inc. - Common Stock",미국
+AGPU,Axe Compute Inc. - Common Stock,미국
+AGRZ,Agroz Inc. - Class A Ordinary Shares,미국
+AGYS,"Agilysys, Inc. - Common Stock",미국
+AHCO,AdaptHealth Corp.  - Common Stock,미국
+AHG,Akso Health Group - American Depositary Shares,미국
+AHMA,Ambitions Enterprise Management Co. L.L.C - Class A Ordinary Shares,미국
+AIAI,AIAI Holdings Corporation - Class A common stock,미국
+AIBZ,Bitzero Holdings Inc. - Common Shares,미국
+AIDX,"20/20 Biolabs, Inc. - Common Stock",미국
+AIFA,"All In FutureTech Alliance, Inc. - Common Stock",미국
+AIFC,AI Financial Corporation - Common Stock,미국
+AIFF,"Firefly Neuroscience, Inc.  - Common Stock",미국
+AIFU,AIFU Inc. - Class A Ordinary Share,미국
+AIIO,Robo.ai Inc. - Class B Ordinary Shares,미국
+AIIR,Air Global PLC - Ordinary shares,미국
+AIMD,"Ainos, Inc. - Common Stock",미국
+AIOK,AI OKTO CORP. - Common Stock,미국
+AIOS,AIOS Tech Inc. - Class A Common Shares,미국
+AIOT,"PowerFleet, Inc. - Common Stock",미국
+AIP,"Arteris, Inc.  - Common Stock",미국
+AIRE,reAlpha Tech Corp. - Common Stock,미국
+AIRG,"Airgain, Inc. - Common Stock",미국
+AIRJ,AirJoule Technologies Corporation - Class A Common Stock,미국
+AIRO,"AIRO Group Holdings, Inc. - Common Stock",미국
+AIRS,"AirSculpt Technologies, Inc. - Common Stock",미국
+AIRT,"Air T, Inc. - Common Stock",미국
+AISP,"Airship AI Holdings, Inc - Class A Common Stock",미국
+AIXI,XIAO-I Corporation - American Depositary Shares,미국
+AKAM,"Akamai Technologies, Inc. - Common Stock",미국
+AKAN,Akanda Corp. - Common Shares,미국
+AKBA,"Akebia Therapeutics, Inc. - Common Stock",미국
+AKTS,"Aktis Oncology, Inc. - Common stock",미국
+AKTX,Akari Therapeutics Plc - American Depositary Shares,미국
+ALAB,"Astera Labs, Inc. - Common Stock",미국
+ALAR,Alarum Technologies Ltd. - American Depositary Shares,미국
+ALCO,"Alico, Inc. - Common Stock",미국
+ALDF,Aldel Financial II Inc. - Class A Ordinary Shares,미국
+ALDX,"Aldeyra Therapeutics, Inc. - Common Stock",미국
+ALEC,"Alector, Inc. - Common Stock",미국
+ALGM,"Allegro MicroSystems, Inc. - Common Stock",미국
+ALGN,"Align Technology, Inc. - Common Stock",미국
+ALGS,"Aligos Therapeutics, Inc. - Common stock",미국
+ALGT,Allegiant Travel Company - Common Stock,미국
+ALHC,"Alignment Healthcare, Inc. - Common Stock",미국
+ALKS,Alkermes plc - Ordinary Shares,미국
+ALKT,"Alkami Technology, Inc. - Common Stock",미국
+ALLO,"Allogene Therapeutics, Inc. - Common Stock",미국
+ALLR,"Allarity Therapeutics, Inc. - Common stock",미국
+ALLT,Allot Ltd. - Ordinary Shares,미국
+ALM,Almonty Industries Inc. - Common Shares,미국
+ALMR,"Alamar Biosciences, Inc. - Class A common stock",미국
+ALMS,Alumis Inc. - Common Stock,미국
+ALMU,"Aeluma, Inc. - Common Stock",미국
+ALNT,Allient Inc. - Common Stock,미국
+ALNY,"Alnylam Pharmaceuticals, Inc. - Common Stock",미국
+ALOV,"Aldabra 4 Liquidity Opportunity Vehicle, Inc. - Class A Ordinary Shares",미국
+ALOY,REalloys Inc. - Common Stock,미국
+ALP,Alpha Compute Corp  - Ordinary Shares,미국
+ALPS,ALPS Group Inc - Ordinary Share,미국
+ALRM,"Alarm.com Holdings, Inc. - Common Stock",미국
+ALRS,Alerus Financial Corporation - Common Stock,미국
+ALT,"Altimmune, Inc. - Common Stock",미국
+ALTI,"AlTi Global, Inc. - Class A Common Stock",미국
+ALTO,"Alto Ingredients, Inc. - Common Stock",미국
+ALVO,Alvotech - Ordinary Shares,미국
+ALXO,ALX Oncology Holdings Inc. - Common Stock,미국
+ALZN,"Alzamend Neuro, Inc. - Common Stock",미국
+AMAL,Amalgamated Financial Corp. - Common Stock,미국
+AMAT,"Applied Materials, Inc. - Common Stock",미국
+AMBA,"Ambarella, Inc. - Ordinary Shares",미국
+AMBR,Amber International Holding Limited - American Depositary Shares,미국
+AMCI,AMC Robotics Corporation - Common Stock,미국
+AMCX,AMC Global Media Inc. - Class A Common Stock,미국
+AMGN,Amgen Inc. - Common Stock,미국
+AMIX,"Autonomix Medical, Inc. - Common Stock",미국
+AMKR,"Amkor Technology, Inc. - Common Stock",미국
+AMLX,"Amylyx Pharmaceuticals, Inc. - Common Stock",미국
+AMOD,"Alpha Modus Holdings, Inc. - Class A Common Stock",미국
+AMPG,"Amplitech Group, Inc. - Common Stock",미국
+AMPGZ,"Amplitech Group, Inc. - Series B Right",미국
+AMPH,"Amphastar Pharmaceuticals, Inc. - Common Stock",미국
+AMPL,"Amplitude, Inc. - Class A Common Stock",미국
+AMRN,Amarin Corporation plc - American Depositary Shares,미국
+AMRO,Amaero Inc. - Common Stock,미국
+AMRX,"Amneal Pharmaceuticals, Inc. - Class A Common Stock",미국
+AMSC,American Superconductor Corporation - Common Stock,미국
+AMSF,"AMERISAFE, Inc. - Common Stock",미국
+AMSS,AMASS Brands Inc. - Common Stock,미국
+AMST,Amesite Inc. - Common Stock,미국
+AMTX,"Aemetis, Inc - Common Stock",미국
+ANAB,"AnaptysBio, Inc. - Common Stock",미국
+ANDE,"The Andersons, Inc. - Common Stock",미국
+ANGH,Anghami Inc. - Ordinary Shares,미국
+ANGI,Angi Inc. - Class A Common Stock,미국
+ANGO,"AngioDynamics, Inc. - Common Stock",미국
+ANIK,Anika Therapeutics Inc. - Common Stock,미국
+ANIP,"ANI Pharmaceuticals, Inc. - Common Stock",미국
+ANIX,"Anixa Biosciences, Inc. - Common Stock",미국
+ANL,Adlai Nortye Group Ltd. - American Depositary Shares,미국
+ANNA,"AleAnna, Inc. - Class A Common Stock",미국
+ANNX,"Annexon, Inc. - common stock",미국
+ANPA,Rich Sparkle Holdings Limited - Ordinary Shares,미국
+ANTA,Antalpha Platform Holding Company - Class A Ordinary Shares,미국
+ANTX,"AN2 Therapeutics, Inc. - Common Stock",미국
+AOSL,Alpha and Omega Semiconductor Limited - Common Shares,미국
+AOUT,"American Outdoor Brands, Inc. - Common Stock",미국
+APA,APA Corporation - Common Stock,미국
+APAC,StoneBridge Acquisition II Corporation - Class A Ordinary Shares,미국
+APC,ARKO Petroleum Corp. - Class A Common Stock,미국
+APEI,"American Public Education, Inc. - Common Stock",미국
+API,"Agora, Inc. - ADS",미국
+APLD,Applied Digital Corporation - Common Stock,미국
+APLM,Apollomics Inc. - Class A Ordinary Shares,미국
+APMD,"Apnimed, Inc. - Common Stock",미국
+APOG,"Apogee Enterprises, Inc. - Common Stock",미국
+APP,Applovin Corporation - Class A Common Stock,미국
+APPF,"AppFolio, Inc. - Class A Common Stock",미국
+APPN,Appian Corporation - Class A Common Stock,미국
+APPS,"Digital Turbine, Inc. - Common Stock",미국
+APRE,"Aprea Therapeutics, Inc. - Common Stock",미국
+APUR,Aperture AC - Class A Ordinary Shares,미국
+APVO,Aptevo Therapeutics Inc. - Common Stock,미국
+APWC,"Asia Pacific Wire & Cable Corporation Limited  - Common shares, Par value .01 per share",미국
+APXT,Apex Treasury Corporation - Class A Ordinary Share,미국
+APYX,Apyx Medical Corporation - Common Stock,미국
+AQB,"AquaBounty Technologies, Inc. - Common Stock",미국
+AQMS,"Aqua Metals, Inc. - Common Stock",미국
+AQST,"Aquestive Therapeutics, Inc. - Common Stock",미국
+ARAI,Arrive AI Inc. - Common Stock,미국
+ARAY,Accuray Incorporated - Common Stock,미국
+ARBB,ARB IOT Group Limited - Ordinary Shares,미국
+ARBE,Arbe Robotics Ltd. - Ordinary Shares,미국
+ARBK,Argo Blockchain plc - American Depositary Shares,미국
+ARCB,ArcBest Corporation - Common Stock,미국
+ARCC,Ares Capital Corporation - Closed End Fund,미국
+ARCI,Archimedes Tech SPAC Partners III Co. - Ordinary Share,미국
+ARCIU,Archimedes Tech SPAC Partners III Co. - Unit,미국
+ARCL,ARC Group Acquisition I Corp - Class A Ordinary Shares,미국
+ARCLR,ARC Group Acquisition I Corp - Right,미국
+ARCLU,ARC Group Acquisition I Corp - Unit,미국
+ARCT,Arcturus Therapeutics Holdings Inc. - Common Stock,미국
+ARDX,"Ardelyx, Inc. - Common Stock",미국
+AREC,American Resources Corporation - Class A Common Stock,미국
+ARGX,argenx SE - American Depositary Shares,미국
+ARHS,"Arhaus, Inc. - Class A Common Stock",미국
+ARKO,ARKO Corp. - Common Stock,미국
+ARKR,Ark Restaurants Corp. - Common Stock,미국
+AROW,Arrow Financial Corporation - Common Stock,미국
+ARQ,"Arq, Inc. - Common Stock",미국
+ARQQ,Arqit Quantum Inc. - Ordinary Shares,미국
+ARQT,"Arcutis Biotherapeutics, Inc. - Common stock",미국
+ARRY,"Array Technologies, Inc. - Common Stock",미국
+ARTL,"Artelo Biosciences, Inc. - Common Stock",미국
+ARTNA,Artesian Resources Corporation - Class A Non-Voting Common Stock,미국
+ARTV,"Artiva Biotherapeutics, Inc. - Common Stock",미국
+ARTW,"Art's-Way Manufacturing Co., Inc. - Common Stock",미국
+ARVN,"Arvinas, Inc. - Common Stock",미국
+ARWR,"Arrowhead Pharmaceuticals, Inc. - Common Stock",미국
+ARXS,"Arxis, Inc. - Class A Common Stock",미국
+ASBP,"Aspire-Lakewood Holdings, Inc. - Common Stock",미국
+ASLE,AerSale Corporation - Common Stock,미국
+ASMB,"Assembly Biosciences, Inc. - Common Stock",미국
+ASML,ASML Holding N.V. - New York Registry Shares,미국
+ASND,Ascendis Pharma A/S - Ordinary Share,미국
+ASO,"Academy Sports and Outdoors, Inc. - Common Stock",미국
+ASPI,ASP Isotopes Inc. - Common Stock,미국
+ASPS,Altisource Portfolio Solutions S.A. - Common Stock,미국
+ASRV,AmeriServ Financial Inc. - Common Stock,미국
+ASST,"Strive, Inc. - Class A Common Stock",미국
+ASTC,Astrotech Corporation - Common Stock,미국
+ASTE,"Astec Industries, Inc. - Common Stock",미국
+ASTH,Astrana Health Inc. - Common Stock,미국
+ASTI,"Ascent Solar Technologies, Inc - Common Stock",미국
+ASTL,Algoma Steel Group Inc. - Common Shares,미국
+ASUR,Asure Software Inc - Common Stock,미국
+ASYS,"Amtech Systems, Inc. - Common Stock",미국
+ATAT,Atour Lifestyle Holdings Limited - American Depositary Shares,미국
+ATCX,Atlas Critical Minerals Corporation - Common Stock,미국
+ATEC,"Alphatec Holdings, Inc. - Common Stock",미국
+ATER,"Aterian, Inc. - Common Stock",미국
+ATEX,Anterix Inc. - Common Stock,미국
+ATGL,Alpha Technology Group Limited - Class A Ordinary Shares,미국
+ATHE,Alterity Therapeutics Limited - American Depositary Shares,미국
+ATHR,"Aether Holdings, Inc. - Common Stock",미국
+ATII,Archimedes Tech SPAC Partners II Co. - Ordinary Shares,미국
+ATIIU,Archimedes Tech SPAC Partners II Co. - Unit,미국
+ATLC,Atlanticus Holdings Corporation - Common Stock,미국
+ATLCL,Atlanticus Holdings Corporation - 6.125% Senior Notes due 2026,미국
+ATLCZ,Atlanticus Holdings Corporation - 9.25% Senior Notes due 2029,미국
+ATLO,Ames National Corporation - Common Stock,미국
+ATLX,Atlas Lithium Corporation - Common Stock,미국
+ATNI,"ATN International, Inc. - Common Stock",미국
+ATOM,Atomera Incorporated - Common Stock,미국
+ATOS,"Atossa Therapeutics, Inc. - Common Stock",미국
+ATPC,Agape ATP Corporation - Common Stock,미국
+ATRA,"Atara Biotherapeutics, Inc. - Common Stock",미국
+ATRC,"AtriCure, Inc. - Common Stock",미국
+ATRO,Astronics Corporation - Common Stock,미국
+ATTO,"Attovia Therapeutics, Inc. - Common Stock",미국
+ATTT,Atlas Trinity Tech Limited - Ordinary Shares,미국
+ATXG,Addentax Group Corp. - Common Stock,미국
+ATYR,"aTyr Pharma, Inc. - Common Stock",미국
+AUBN,"Auburn National Bancorporation, Inc. - Common Stock",미국
+AUC,ATIF Holdings Limited - Ordinary Shares,미국
+AUDC,AudioCodes Ltd. - Ordinary Shares,미국
+AUGO,Aura Minerals Inc. - Common Shares,미국

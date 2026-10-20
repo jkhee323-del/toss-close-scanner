@@ -40,3 +40,13 @@ jobs:
             git commit -m "Auto-update global market data"
             git push
           fi
+
+      - name: Sync global data to test site
+        run: |
+          git fetch origin accuracy-lab
+          git switch -C accuracy-lab origin/accuracy-lab
+          git restore --source=origin/main --staged --worktree -- data/global_history data/global_candidates.csv
+          if ! git diff --cached --quiet; then
+            git commit -m "Auto-sync global data to test site"
+            git push origin HEAD:accuracy-lab
+          fi

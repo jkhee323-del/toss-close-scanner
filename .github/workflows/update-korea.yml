@@ -40,7 +40,7 @@ jobs:
             git push
           fi
                 - name: Sync global data to test site
-        run: |
+          run: |
           git fetch origin accuracy-lab
           git switch -C accuracy-lab origin/accuracy-lab
           git restore --source=origin/main --staged --worktree -- data/history data/kr_names.csv

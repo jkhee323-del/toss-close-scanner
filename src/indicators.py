@@ -32,7 +32,12 @@ def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
     gain = delta.clip(lower=0).rolling(14).mean()
     loss = (-delta.clip(upper=0)).rolling(14).mean()
     rs = gain / loss.replace(0, np.nan)
-    x["rsi14"] = 100 - (100 / (1 + rs))
+    rsi = 100 - (100 / (1 + rs))
+    # No losses in the window means RSI=100 when there are gains;
+    # no gains and no losses means RSI=50 (flat market).
+    rsi = rsi.mask((loss == 0) & (gain > 0), 100.0)
+    rsi = rsi.mask((loss == 0) & (gain == 0), 50.0)
+    x["rsi14"] = rsi
     # On-Balance Volume (OBV): cumulative signed volume.
     # Derived only from current and earlier daily closes and volumes.
     direction = np.sign(x["close"].diff()).fillna(0.0)

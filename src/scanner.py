@@ -8,7 +8,9 @@ def scan_symbol(symbol: str, name: str, df: pd.DataFrame) -> dict | None:
     if len(df) < 70:
         return None
 
-    x = add_indicators(df)
+    # Indicator windows must be calculated in chronological order.
+    ordered = df.sort_values("date").reset_index(drop=True)
+    x = add_indicators(ordered)
     row = x.iloc[-1]
 
     required = [

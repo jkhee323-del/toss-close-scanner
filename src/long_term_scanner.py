@@ -177,7 +177,9 @@ def get_recommendations(choice: str, market: str = "KR"):
     history_dir = US_HISTORY_DIR if market == "US" else HISTORY_DIR
 
 
-    us_tickers = set(pd.read_csv("data/us_universe.csv", dtype=str)["ticker"])
+    us_tickers = set()
+    if market == "US":
+        us_tickers = set(pd.read_csv("data/us_universe.csv", dtype=str)["ticker"])
 
 
     for path in sorted(history_dir.glob("*.csv")):

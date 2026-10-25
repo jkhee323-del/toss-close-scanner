@@ -28,19 +28,26 @@ def analyze_stock(path: Path, horizon: int):
     try:
         df = pd.read_csv(path)
 
-        required = {"date", "close", "volume"}
+        required = {"date", "open", "high", "low", "close", "volume"}
         if not required.issubset(df.columns):
             return None
 
         df["date"] = pd.to_datetime(df["date"], errors="coerce")
-        df["close"] = pd.to_numeric(df["close"], errors="coerce")
+        for column in ("open", "high", "low", "close"):
+            df[column] = pd.to_numeric(df[column], errors="coerce")
         df["volume"] = pd.to_numeric(df["volume"], errors="coerce")
 
         df = (
-            df.dropna(subset=["date", "close", "volume"])
+            df.dropna(subset=["date", "open", "high", "low", "close", "volume"])
             .sort_values("date")
             .drop_duplicates("date")
         )
+
+        # Reject invalid OHLCV rows rather than generating infinite scores.
+        if (df[["open", "high", "low", "close"]] <= 0).any().any():
+            return None
+        if (df["volume"] < 0).any():
+            return None
 
         if len(df) < max(241, horizon + 1):
             return None

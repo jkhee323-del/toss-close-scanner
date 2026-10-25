@@ -35,3 +35,42 @@ def test_invalid_horizon_returns_empty_without_reading_files(tmp_path, monkeypat
     result = scanner.get_recommendations("invalid", market="KR")
     assert isinstance(result, pd.DataFrame)
     assert result.empty
+
+
+def test_rejects_missing_ohlcv_columns(tmp_path):
+    path = tmp_path / "000001.csv"
+    dates = pd.date_range("2025-01-01", periods=250, freq="B")
+    pd.DataFrame({"date": dates, "close": 100.0, "volume": 1000}).to_csv(path, index=False)
+    assert scanner.analyze_stock(path, 20) is None
+
+
+def test_rejects_zero_historical_close_without_infinite_momentum(tmp_path):
+    path = tmp_path / "000002.csv"
+    dates = pd.date_range("2025-01-01", periods=250, freq="B")
+    close = [100.0] * 250
+    close[-21] = 0.0
+    pd.DataFrame({
+        "date": dates,
+        "open": [100.0] * 250,
+        "high": [101.0] * 250,
+        "low": [99.0] * 250,
+        "close": close,
+        "volume": [1000] * 250,
+    }).to_csv(path, index=False)
+    assert scanner.analyze_stock(path, 20) is None
+
+
+def test_rejects_negative_volume(tmp_path):
+    path = tmp_path / "000003.csv"
+    dates = pd.date_range("2025-01-01", periods=250, freq="B")
+    volume = [1000] * 250
+    volume[-1] = -10
+    pd.DataFrame({
+        "date": dates,
+        "open": [100.0] * 250,
+        "high": [101.0] * 250,
+        "low": [99.0] * 250,
+        "close": [100.0] * 250,
+        "volume": volume,
+    }).to_csv(path, index=False)
+    assert scanner.analyze_stock(path, 20) is None

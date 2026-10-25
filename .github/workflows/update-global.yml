@@ -43,9 +43,10 @@ jobs:
 
       - name: Sync global data to test site
         run: |
+          updated_main=$(git rev-parse HEAD)
           git fetch origin accuracy-lab
           git switch -C accuracy-lab origin/accuracy-lab
-          git restore --source=origin/main --staged --worktree -- data/global_history data/global_candidates.csv
+          git restore --source="$updated_main" --staged --worktree -- data/global_history data/global_candidates.csv
           if ! git diff --cached --quiet; then
             git commit -m "Auto-sync global data to test site"
             git push origin HEAD:accuracy-lab

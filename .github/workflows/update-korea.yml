@@ -1,6 +1,10 @@
 ﻿name: Update Korea market data
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/update-korea.yml'
   schedule:
     # 16:35 KST, Monday-Friday (07:35 UTC)
     - cron: "35 7 * * 1-5"

@@ -16,7 +16,8 @@ import pandas as pd
 from pykrx import stock
 
 from .indicators import add_indicators
-from .us_session_guard import keep_confirmed_us_daily
+from .us_session_guard import keep_confirmed_market_daily
+from .global_market_safety import validate_ohlcv, merge_price_history, atomic_save_history
 from .search import GLOBAL_SCAN_UNIVERSE
 
 DATA = Path("data")
@@ -83,7 +84,7 @@ def update_korea() -> None:
         raise RuntimeError("Too many KRX refresh failures")
 
 
-def _fetch_global(ticker: str) -> pd.DataFrame:
+def _fetch_global(ticker: str, *, country: str = "미국") -> pd.DataFrame:
     import yfinance as yf
 
     raw = yf.download(ticker, period="1y", interval="1d", auto_adjust=False, progress=False, threads=False)
@@ -107,8 +108,8 @@ def _fetch_global(ticker: str) -> pd.DataFrame:
     # Preserve vendor session dates. A timezone-aware timestamp is converted
     # to New York, while a timezone-naive date is already a session label.
     # Never persist a bar from the current US session before 17:00 NY time.
-    safe = keep_confirmed_us_daily(out)
-    return safe.dropna(subset=need[1:]).sort_values("date").reset_index(drop=True)
+    safe = keep_confirmed_market_daily(out, country)
+    return validate_ohlcv(safe, min_rows=70)
 
 
 def _technical_score(row: pd.Series) -> float:
@@ -164,10 +165,15 @@ def update_global() -> None:
 
     def one(item):
         ticker, name, country = item
-        df = _fetch_global(ticker)
-        safe = ticker.replace("/", "_")
-        df.to_csv(GLOBAL_HISTORY / f"{safe}.csv", index=False, encoding="utf-8-sig")
-        return _global_rows(ticker, name, country, df)
+        fresh = _fetch_global(ticker, country=country)
+        safe_name = ticker.replace("/", "_")
+        path = GLOBAL_HISTORY / f"{safe_name}.csv"
+        history = merge_price_history(path, fresh)
+        candidates = _global_rows(ticker, name, country, history)
+        if not candidates:
+            raise ValueError(f"{ticker}: insufficient valid indicator rows")
+        atomic_save_history(path, history)
+        return candidates
 
     failures = 0
     with ThreadPoolExecutor(max_workers=5) as ex:

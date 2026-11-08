@@ -17,7 +17,7 @@ from pykrx import stock
 
 from .indicators import add_indicators
 from .us_session_guard import keep_confirmed_market_daily
-from .global_market_safety import validate_ohlcv, merge_price_history, atomic_save_history
+from .global_market_safety import validate_ohlcv, merge_price_history, atomic_save_history, atomic_write_table
 from .search import GLOBAL_SCAN_UNIVERSE
 
 DATA = Path("data")
@@ -188,10 +188,13 @@ def update_global() -> None:
 
     if not rows:
         raise RuntimeError("No global candidates could be refreshed")
+    # A provider outage must not publish a misleading partial market ranking.
+    if failures > max(2, len(GLOBAL_SCAN_UNIVERSE) // 4):
+        raise RuntimeError(f"Too many global data failures: {failures}/{len(GLOBAL_SCAN_UNIVERSE)}; previous candidate cache preserved")
     z = pd.DataFrame(rows)
     out = (z.sort_values(["day_offset", "candidate_score", "trading_value"], ascending=[True, False, False])
              .groupby("day_offset", group_keys=False).head(14).reset_index(drop=True))
-    out.to_csv(GLOBAL_CACHE, index=False, encoding="utf-8-sig")
+    atomic_write_table(GLOBAL_CACHE, out)
     print(f"Global refresh: candidates={len(out)}, failed={failures}/{len(GLOBAL_SCAN_UNIVERSE)}")
 
 

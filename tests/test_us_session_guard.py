@@ -18,7 +18,7 @@ from src.us_session_guard import cutoff_date, keep_confirmed_us_daily
 )
 def test_dst_cutoff(instant, expected_count):
     date = "2026-07-01" if instant.startswith("2026-07") else "2026-11-02"
-    frame = pd.DataFrame({"date": [pd.Timestamp(date) - pd.Timedelta(days=3), pd.Timestamp(date)]})
+    frame = pd.DataFrame({"date": [pd.Timestamp(date) - pd.offsets.BDay(1), pd.Timestamp(date)]})
     result = keep_confirmed_us_daily(frame, now=datetime.fromisoformat(instant))
     assert len(result) == expected_count
 

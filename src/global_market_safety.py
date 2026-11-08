@@ -96,3 +96,27 @@ def atomic_save_history(path: Path, frame: pd.DataFrame) -> bool:
     finally:
         if tmp is not None and tmp.exists():
             tmp.unlink()
+
+
+def atomic_write_table(path: Path, frame: pd.DataFrame) -> None:
+    """Atomically publish a derived candidates table after it was computed.
+
+    Unlike a price-history write, arbitrary named columns are permitted.
+    """
+    if not isinstance(frame, pd.DataFrame) or frame.empty:
+        raise ValueError("refusing to publish empty candidate table")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8-sig", newline="", suffix=".csv",
+            prefix=f".{path.stem}_", dir=path.parent, delete=False
+        ) as handle:
+            tmp = Path(handle.name)
+            frame.to_csv(handle, index=False)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp, path)
+    finally:
+        if tmp is not None and tmp.exists():
+            tmp.unlink()

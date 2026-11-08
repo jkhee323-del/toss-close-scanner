@@ -16,6 +16,7 @@ import pandas as pd
 from pykrx import stock
 
 from .indicators import add_indicators
+from .us_session_guard import keep_confirmed_us_daily
 from .search import GLOBAL_SCAN_UNIVERSE
 
 DATA = Path("data")
@@ -103,8 +104,11 @@ def _fetch_global(ticker: str) -> pd.DataFrame:
     raw = raw.reset_index().rename(columns={"Date": "date", "Open": "open", "High": "high", "Low": "low", "Close": "close", "Volume": "volume"})
     need = ["date", "open", "high", "low", "close", "volume"]
     out = raw[need].copy()
-    out["date"] = pd.to_datetime(out["date"], utc=True).dt.tz_localize(None)
-    return out.dropna(subset=need[1:]).sort_values("date").reset_index(drop=True)
+    # Preserve vendor session dates. A timezone-aware timestamp is converted
+    # to New York, while a timezone-naive date is already a session label.
+    # Never persist a bar from the current US session before 17:00 NY time.
+    safe = keep_confirmed_us_daily(out)
+    return safe.dropna(subset=need[1:]).sort_values("date").reset_index(drop=True)
 
 
 def _technical_score(row: pd.Series) -> float:

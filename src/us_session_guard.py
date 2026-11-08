@@ -1,8 +1,8 @@
-"""Conservative US daily-bar close guard (research/data-ingestion use).
+"""Conservative end-of-session guard for daily Yahoo OHLCV ingestion.
 
-This rejects the current NYSE date until 17:00 America/New_York. It accounts
-for US daylight saving automatically, but does NOT certify that a vendor bar
-is final, corrected, or exchange-calendar-valid. Re-download suspect history.
+Yahoo's timezone-naive Date column is a local exchange session label.
+Timezone-aware timestamps are first converted to the exchange's zone.
+The release buffer does not prove vendor finality or validate exchange holidays.
 """
 from __future__ import annotations
 
@@ -11,49 +11,73 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
+# A deliberately conservative one-hour (or greater) margin after the
+# principal cash session closes. Country labels come from GLOBAL_SCAN_UNIVERSE.
+MARKETS = {
+    "미국": ("America/New_York", time(17, 0)),     # NYSE 16:00
+    "일본": ("Asia/Tokyo", time(16, 30)),         # TSE 15:30
+    "독일": ("Europe/Berlin", time(18, 30)),      # Xetra 17:30
+    "네덜란드": ("Europe/Amsterdam", time(18, 30)),
+    "프랑스": ("Europe/Paris", time(18, 30)),
+    "스위스": ("Europe/Zurich", time(18, 30)),
+}
 NEW_YORK = ZoneInfo("America/New_York")
 SAFE_RELEASE_TIME = time(17, 0)
 
 
-def cutoff_date(*, now: datetime | None = None):
-    """Latest *calendar date* permitted by a conservative US closing clock."""
+def market_cutoff(country: str, *, now: datetime | None = None):
+    """Return (local calendar date, today's bar can be released)."""
+    if country not in MARKETS:
+        raise ValueError(f"Unsupported exchange country: {country}")
+    zone_name, release = MARKETS[country]
+    zone = ZoneInfo(zone_name)
     if now is None:
-        clock = datetime.now(NEW_YORK)
+        local = datetime.now(zone)
     else:
         if now.tzinfo is None or now.utcoffset() is None:
             raise ValueError("now must be timezone-aware")
-        clock = now.astimezone(NEW_YORK)
-    # Compare local date and local clock; prior days are allowed during trading.
-    return clock.date(), clock.time() >= SAFE_RELEASE_TIME
+        local = now.astimezone(zone)
+    return local.date(), local.time() >= release
 
 
-def keep_confirmed_us_daily(frame: pd.DataFrame, *, now: datetime | None = None) -> pd.DataFrame:
-    """Drop uncompleted, future-dated, and weekend US daily bars.
+def cutoff_date(*, now: datetime | None = None):
+    """Backwards-compatible US cutoff accessor."""
+    return market_cutoff("미국", now=now)
 
-    Date-only or tz-naive inputs are interpreted as vendor session-date labels.
-    Tz-aware inputs are first converted to New York, preventing UTC date drift.
-    Output date is tz-naive midnight local session date. Does not modify input.
 
-    The 17:00 clock is a conservative buffer, not proof of provider finality.
+def keep_confirmed_market_daily(
+    frame: pd.DataFrame, country: str, *, now: datetime | None = None
+) -> pd.DataFrame:
+    """Remove future, weekend, and still-open exchange-session rows.
+
+    Naive dates are treated as *session labels* (no UTC conversion).
+    Aware timestamps are converted to the country's exchange time zone.
+    Always returns naive, normalized local session dates on a copy.
+
+    This is an ingestion-time protection only; a historical row collected
+    intraday cannot be certified as final using its date alone.
     """
     if not isinstance(frame, pd.DataFrame) or "date" not in frame:
         raise ValueError("OHLCV frame with date column required")
+    # Validate the market even for an empty frame.
+    today, complete = market_cutoff(country, now=now)
     if frame.empty:
         return frame.copy()
-
-    dates = pd.to_datetime(frame["date"], errors="coerce")
-    if dates.isna().any():
+    parsed = pd.to_datetime(frame["date"], errors="coerce")
+    if parsed.isna().any():
         raise ValueError("invalid daily-bar date")
-    if isinstance(dates.dtype, pd.DatetimeTZDtype):
-        dates = dates.dt.tz_convert(NEW_YORK).dt.tz_localize(None)
-    elif not isinstance(dates.dtype, pd.DatetimeTZDtype) and not pd.api.types.is_datetime64_any_dtype(dates):
+    if isinstance(parsed.dtype, pd.DatetimeTZDtype):
+        parsed = parsed.dt.tz_convert(MARKETS[country][0]).dt.tz_localize(None)
+    elif not pd.api.types.is_datetime64_any_dtype(parsed):
         raise ValueError("mixed or unsupported time zones in date column")
-
-    dates = dates.dt.normalize()
-    today, complete = cutoff_date(now=now)
-    # .dt.weekday avoids accepting an accidental Saturday/Sunday daily bar.
-    mask = (dates.dt.date < today) | ((dates.dt.date == today) & complete)
-    mask &= dates.dt.dayofweek < 5
+    sessions = parsed.dt.normalize()
+    mask = (sessions.dt.date < today) | ((sessions.dt.date == today) & complete)
+    mask &= sessions.dt.dayofweek < 5
     out = frame.loc[mask].copy()
-    out["date"] = dates.loc[mask].to_numpy()
+    out["date"] = sessions.loc[mask].to_numpy()
     return out.reset_index(drop=True)
+
+
+def keep_confirmed_us_daily(frame: pd.DataFrame, *, now: datetime | None = None) -> pd.DataFrame:
+    """Backwards-compatible US daily guard."""
+    return keep_confirmed_market_daily(frame, "미국", now=now)

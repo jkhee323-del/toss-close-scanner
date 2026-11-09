@@ -54,3 +54,35 @@ V3.1 ZIP. The local V3.1 previously had 39 tests in a different project state.
 3. Run the local V3.1 complete test suite and real-provider smoke checks.
 4. Run purged walk-forward AI evaluation and out-of-sample trade P&L audits.
 5. Build a separate development ZIP only after the merged copy passes tests.
+
+## 2026-11-09 update: US horizon model research
+
+Added `src/us_horizon_research.py` and `tests/test_us_horizon_research.py`.
+The experiment evaluates 20/60/120/240 completed trading-session outcomes
+with a strict outcome-date-purged chronological holdout, past-only features,
+always-up and train-prior baselines, and explicit non-live status. Models
+are never written without the opt-in `--save-experimental` switch and an
+out-of-sample research gate. Even passing it would NOT imply calibrated odds
+or trading suitability.
+
+GitHub Actions regression:
+https://github.com/jkhee323-del/toss-close-scanner/actions/runs/42627214063
+
+- Python 3.13 source compilation passed.
+- 43 regression tests passed.
+
+Actual GitHub-cached historical data experiment:
+https://github.com/jkhee323-del/toss-close-scanner/actions/runs/42627499601
+
+- 66 valid catalogued US stock histories.
+- 1 month (20 sessions): OOS_GATE_FAILED (3,498 held-out rows).
+- 3 months (60 sessions): OOS_GATE_FAILED (2,838 held-out rows).
+- 6 months (120 sessions): INSUFFICIENT_LABELLED_DATA.
+- 12 months (240 sessions): INSUFFICIENT_LABELLED_DATA.
+- No new model was saved for live use; this is a research-only result.
+
+**Important limitation:** The GitHub branch has much less historical US data
+than the user's newer offline Windows V3.1 copy. These findings do not
+re-evaluate the four experimental .joblib models on that Windows copy. Before
+a new full-length US evaluation, obtain sufficiently long, corporate-action-
+reviewed, complete-session price histories and re-run purged forward tests.

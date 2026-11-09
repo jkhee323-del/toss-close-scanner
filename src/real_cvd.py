@@ -32,14 +32,20 @@ def calculate_cvd(
     x = trades[list(COLUMNS)].copy()
     if x.isna().any().any():
         raise CVDDataError("null trade input")
+    # Check each record BEFORE coercing its timezone. Mixed aware/naive
+    # strings can otherwise be transformed to NaT and obscure the error.
+    for value in x["timestamp"]:
+        try:
+            stamp = pd.Timestamp(value)
+        except (ValueError, TypeError, OverflowError) as exc:
+            raise CVDDataError("invalid timestamps") from exc
+        if pd.isna(stamp):
+            raise CVDDataError("invalid timestamps")
+        if stamp.tzinfo is None or stamp.utcoffset() is None:
+            raise CVDDataError("timestamps must be timezone-aware")
     ts = pd.to_datetime(x["timestamp"], utc=True, errors="coerce")
     if ts.isna().any():
         raise CVDDataError("invalid timestamps")
-    # Reject timezone-naive inputs; converting naive to UTC would invent time zone.
-    for v in x["timestamp"]:
-        stamp = pd.Timestamp(v)
-        if stamp.tzinfo is None or stamp.utcoffset() is None:
-            raise CVDDataError("timestamps must be timezone-aware")
     x["timestamp"] = ts
     if (x["aggressor_side"].map(lambda s: s in ("buy", "sell")) == False).any():
         raise CVDDataError("aggressor_side must be explicit buy or sell")

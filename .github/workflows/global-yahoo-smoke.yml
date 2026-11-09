@@ -1,0 +1,29 @@
+name: Global Yahoo Read-Only Smoke Test
+
+on:
+  push:
+    branches: [lab-us-session-20261108]
+    paths:
+      - ".github/workflows/global-yahoo-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: python -m pip install -r requirements.txt
+      - name: Fetch one ticker five-year history without modifying repository data
+        run: python -m src.auto_update --market global --history-period 5y --max-symbols 1 --dry-run
+      - name: Verify Git working tree was not modified
+        run: |
+          git diff --exit-code
+          git diff --cached --exit-code

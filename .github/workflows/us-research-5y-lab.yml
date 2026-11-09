@@ -1,0 +1,41 @@
+name: Isolated US Five-Year AI Research
+
+on:
+  push:
+    branches: [lab-us-session-20261108]
+    paths:
+      - ".github/workflows/us-research-5y-lab.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install data and model dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Download historical research sample and evaluate research-only models
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m src.us_research_backfill --history-output reports/us_research_5y/history --report-output reports/us_research_5y/analysis --max-symbols 12
+      - name: Verify no tracked files were changed
+        run: |
+          git diff --exit-code
+          git diff --cached --exit-code
+      - name: Upload research results without historic cache
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: us-five-year-horizon-evaluation
+          path: reports/us_research_5y/analysis/*.json
+          if-no-files-found: warn
+          retention-days: 14

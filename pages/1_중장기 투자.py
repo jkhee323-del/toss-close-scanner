@@ -4,6 +4,7 @@ import streamlit as st
 
 from src.long_term_scanner import HORIZONS, get_recommendations
 from src.search import load_kr_listing, US_NAME_MAP
+from src.kr_investor_flows import latest_flow_snapshot
 
 
 st.set_page_config(
@@ -192,6 +193,26 @@ else:
     result = result.head(top_n).copy()
 
 
+    # Net purchases are based on real KRX observations, never on OHLCV.
+    # A missing/stale value stays unavailable rather than becoming zero.
+    if market_code == "KR":
+        def net_flows_at_analysis_date(code, analysis_date):
+            snapshot = latest_flow_snapshot(str(code))
+            if snapshot is None or snapshot["date"] != str(analysis_date):
+                return None, None
+            return (snapshot["institutional_net_krw"],
+                    snapshot["foreign_net_krw"])
+
+        snapshots = [
+            net_flows_at_analysis_date(code, asof)
+            for code, asof in zip(result["종목코드"], result["기준일"])
+        ]
+        result["기관 순매수(원)"] = [item[0] for item in snapshots]
+        result["외국인 순매수(원)"] = [item[1] for item in snapshots]
+        if not any(item[0] is not None for item in snapshots):
+            st.caption("기관·외국인 수급: 기준일과 일치하는 검증된 KRX 데이터가 없어 표시하지 않습니다.")
+        st.caption("CVD: 실제 매수·매도 주도 체결 데이터가 없으면 표시하지 않습니다. OBV와 다른 지표입니다.")
+
     display_columns = [
         "순위",
         "기업명",
@@ -202,6 +223,8 @@ else:
         "가격위치(%)",
         "OBV_5일",
         "OBV_20일",
+        "기관 순매수(원)",
+        "외국인 순매수(원)",
     ]
 
     display_columns = [

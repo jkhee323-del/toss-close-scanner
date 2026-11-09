@@ -167,10 +167,11 @@ def update_global(*, history_period: str = "1y", max_symbols: int = 0, dry_run: 
     if max_symbols < 0:
         raise ValueError("max_symbols cannot be negative")
     # Dry runs must not create output directories or modify cached data.
-    if not dry_run:
-        GLOBAL_HISTORY.mkdir(parents=True, exist_ok=True)
+    # Stage every successful symbol in memory before writing any price cache.
+    # A large provider outage must not partially update historical training CSVs.
     selected = list(GLOBAL_SCAN_UNIVERSE[:max_symbols] if max_symbols else GLOBAL_SCAN_UNIVERSE)
     rows: list[dict] = []
+    pending: list[tuple[Path, pd.DataFrame]] = []
 
     def one(item):
         ticker, name, country = item
@@ -182,9 +183,8 @@ def update_global(*, history_period: str = "1y", max_symbols: int = 0, dry_run: 
         candidates = _global_rows(ticker, name, country, history)
         if not candidates:
             raise ValueError(f"{ticker}: insufficient valid indicator rows")
-        if not dry_run:
-            atomic_save_history(path, history)
-        return candidates
+        # Do not write here: worker failures are assessed as a batch first.
+        return candidates, path, history
 
     failures = 0
     with ThreadPoolExecutor(max_workers=5) as ex:
@@ -192,7 +192,9 @@ def update_global(*, history_period: str = "1y", max_symbols: int = 0, dry_run: 
         for fut in as_completed(futures):
             item = futures[fut]
             try:
-                rows.extend(fut.result())
+                candidates, path, history = fut.result()
+                rows.extend(candidates)
+                pending.append((path, history))
             except Exception as exc:  # noqa: BLE001
                 failures += 1
                 print(f"[WARN] {item[0]}: {exc}")
@@ -205,8 +207,13 @@ def update_global(*, history_period: str = "1y", max_symbols: int = 0, dry_run: 
     z = pd.DataFrame(rows)
     out = (z.sort_values(["day_offset", "candidate_score", "trading_value"], ascending=[True, False, False])
              .groupby("day_offset", group_keys=False).head(14).reset_index(drop=True))
-    if not dry_run and not max_symbols:
-        atomic_write_table(GLOBAL_CACHE, out)
+    if not dry_run:
+        # All downloads/merges have passed the provider-failure gate.
+        # Atomic replacement protects each file from an interrupted write.
+        for path, history in pending:
+            atomic_save_history(path, history)
+        if not max_symbols:
+            atomic_write_table(GLOBAL_CACHE, out)
     print(f"Global refresh: candidates={len(out)}, failed={failures}/{len(selected)}, dry_run={dry_run}, max_symbols={max_symbols}")
 
 

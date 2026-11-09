@@ -84,10 +84,12 @@ def update_korea() -> None:
         raise RuntimeError("Too many KRX refresh failures")
 
 
-def _fetch_global(ticker: str, *, country: str = "미국") -> pd.DataFrame:
+def _fetch_global(ticker: str, *, country: str = "미국", period: str = "1y") -> pd.DataFrame:
+    if period not in {"1y", "5y"}:
+        raise ValueError("Unsupported Yahoo history period")
     import yfinance as yf
 
-    raw = yf.download(ticker, period="1y", interval="1d", auto_adjust=False, progress=False, threads=False)
+    raw = yf.download(ticker, period=period, interval="1d", auto_adjust=False, progress=False, threads=False)
     if raw is None or raw.empty:
         raise ValueError("empty Yahoo response")
 
@@ -158,14 +160,17 @@ def _global_rows(ticker: str, name: str, country: str, df: pd.DataFrame) -> list
     return rows
 
 
-def update_global() -> None:
+def update_global(*, history_period: str = "1y") -> None:
     """Refresh global price cache and precompute today/previous-3-day candidates."""
+    if history_period not in {"1y", "5y"}:
+        raise ValueError("Only 1y or 5y history periods are accepted")
     GLOBAL_HISTORY.mkdir(parents=True, exist_ok=True)
     rows: list[dict] = []
 
     def one(item):
         ticker, name, country = item
-        fresh = _fetch_global(ticker, country=country)
+        fresh = (_fetch_global(ticker, country=country) if history_period == "1y"
+                 else _fetch_global(ticker, country=country, period=history_period))
         safe_name = ticker.replace("/", "_")
         path = GLOBAL_HISTORY / f"{safe_name}.csv"
         history = merge_price_history(path, fresh)
@@ -201,11 +206,13 @@ def update_global() -> None:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--market", choices=["kr", "global", "all"], default="all")
+    ap.add_argument("--history-period", choices=["1y", "5y"], default="1y",
+                    help="Use 5y only for deliberate history backfill")
     args = ap.parse_args()
     if args.market in {"kr", "all"}:
         update_korea()
     if args.market in {"global", "all"}:
-        update_global()
+        update_global(history_period=args.history_period)
 
 
 if __name__ == "__main__":

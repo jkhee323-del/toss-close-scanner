@@ -22,6 +22,8 @@ jobs:
           cache: pip
       - run: python -m pip install -r requirements.txt
       - name: Fetch one ticker five-year history without modifying repository data
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
         run: python -m src.auto_update --market global --history-period 5y --max-symbols 1 --dry-run
       - name: Verify Git working tree was not modified
         run: |

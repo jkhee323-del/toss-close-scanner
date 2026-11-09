@@ -11,13 +11,14 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 from pykrx import stock
 
 from .indicators import add_indicators
 from .us_session_guard import keep_confirmed_market_daily
-from .global_market_safety import validate_ohlcv, merge_price_history, atomic_save_history, atomic_write_table
+from .global_market_safety import PriceDataError, validate_ohlcv, merge_price_history, atomic_save_history, atomic_write_table
 from .search import GLOBAL_SCAN_UNIVERSE
 
 DATA = Path("data")
@@ -40,40 +41,52 @@ def _normalize_kr(raw: pd.DataFrame) -> pd.DataFrame:
 
 
 def update_korea() -> None:
-    """Incrementally append the latest KRX trading days to every stored symbol."""
+    """Append only confirmed KRX bars, validating and atomically saving CSVs.
+
+    A provider failure may leave some independently saved symbols unchanged;
+    no invalid bar is allowed to corrupt a symbol's existing CSV. Automatic
+    holidays and exchange shutdowns still require independent verification.
+    """
     KR_HISTORY.mkdir(parents=True, exist_ok=True)
     paths = sorted(KR_HISTORY.glob("*.csv"))
     if not paths:
         raise RuntimeError("data/history has no CSV files")
 
-    end = datetime.now() + timedelta(days=1)
+    end = datetime.now(ZoneInfo("Asia/Seoul")) + timedelta(days=1)
     ok = fail = unchanged = 0
     for i, path in enumerate(paths, 1):
         symbol = path.stem.zfill(6)
         try:
-            old = pd.read_csv(path, parse_dates=["date"]).sort_values("date")
+            old = validate_ohlcv(pd.read_csv(path), min_rows=70)
             last = pd.Timestamp(old["date"].max())
-            # Re-fetch a small overlap to safely handle revisions/holidays.
             start = (last - pd.Timedelta(days=10)).strftime("%Y%m%d")
             raw = stock.get_market_ohlcv_by_date(start, end.strftime("%Y%m%d"), symbol)
             fresh = _normalize_kr(raw)
             if fresh.empty:
                 unchanged += 1
                 continue
-            merged = pd.concat([old, fresh], ignore_index=True)
-            merged["date"] = pd.to_datetime(merged["date"]).dt.tz_localize(None)
-            merged = merged.drop_duplicates("date", keep="last").sort_values("date").tail(1200).reset_index(drop=True)
-            before = last.normalize()
-            after = pd.Timestamp(merged["date"].max()).normalize()
-            # Always rewrite overlap only when values or date count changed.
-            old_cmp = old.tail(1200).reset_index(drop=True)
-            same = len(old_cmp) == len(merged) and old_cmp.equals(merged)
-            if same:
+            # KRX's intraday quote must not become a permanent daily bar.
+            fresh = keep_confirmed_market_daily(fresh, "한국")
+            if fresh.empty:
                 unchanged += 1
-            else:
-                merged.to_csv(path, index=False, encoding="utf-8-sig")
+                continue
+            fresh = validate_ohlcv(fresh, min_rows=1)
+            overlap = old[["date", "close"]].merge(
+                fresh[["date", "close"]], on="date", how="inner",
+                suffixes=("_old", "_new"),
+            )
+            if not overlap.empty and (
+                (overlap["close_new"] / overlap["close_old"] - 1).abs() > 0.25
+            ).any():
+                raise PriceDataError("large KRX overlap discrepancy; manual split/correction review required")
+            merged = pd.concat([old, fresh], ignore_index=True)
+            merged = validate_ohlcv(merged, min_rows=70).tail(1200).reset_index(drop=True)
+            changed = atomic_save_history(path, merged)
+            if changed:
                 ok += 1
-                print(f"[{i}/{len(paths)}] {symbol}: {before.date()} -> {after.date()}")
+                print(f"[{i}/{len(paths)}] {symbol}: {last.date()} -> {merged['date'].max().date()}")
+            else:
+                unchanged += 1
         except Exception as exc:  # noqa: BLE001
             fail += 1
             print(f"[WARN] {symbol}: {exc}")

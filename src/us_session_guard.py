@@ -14,6 +14,7 @@ import pandas as pd
 # A deliberately conservative one-hour (or greater) margin after the
 # principal cash session closes. Country labels come from GLOBAL_SCAN_UNIVERSE.
 MARKETS = {
+    "한국": ("Asia/Seoul", time(16, 30)),       # KRX 15:30 + conservative 1h
     "미국": ("America/New_York", time(17, 0)),     # NYSE 16:00
     "일본": ("Asia/Tokyo", time(16, 30)),         # TSE 15:30
     "독일": ("Europe/Berlin", time(18, 30)),      # Xetra 17:30

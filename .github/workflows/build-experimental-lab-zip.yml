@@ -5,6 +5,9 @@ on:
     branches: [lab-us-session-20261108]
     paths:
       - ".github/workflows/build-experimental-lab-zip.yml"
+      - "src/auto_update.py"
+      - "tests/test_korean_refresh_safety.py"
+      - "LAB_BUILD_NOT_FINAL.md"
   workflow_dispatch:
 
 permissions:

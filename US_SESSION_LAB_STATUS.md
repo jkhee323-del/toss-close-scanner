@@ -129,3 +129,37 @@ reviewed, complete-session price histories and re-run purged forward tests.
    with verified aggressor side.
 5. Next-day return model improvements, final UX end-to-end check, production
    gate and final ZIP are outstanding. Production `main` is unchanged.
+
+
+## 2026-11-09 final lab verification and eight-workstream status
+
+- **58/58 regression tests passed**, Python 3.13, source/page compilation:
+  https://github.com/jkhee323-del/toss-close-scanner/actions/runs/42631011470
+- Live Yahoo one-stock 5-year read-only smoke; no tracked modifications:
+  https://github.com/jkhee323-del/toss-close-scanner/actions/runs/42630508779
+- Checked-in US cache audit: 66 structurally valid US files, but no one ticker
+  has the 300+ sessions needed for conservative month-scale modeling:
+  https://github.com/jkhee323-del/toss-close-scanner/actions/runs/42629921855
+- **Isolated research 5y backfill**: 12 sampled US-listed tickers each have
+  1,255 validated bars. All 1m/3m/6m/12m models FAILED OOS research gates.
+  No new model was published; sampled universe is survivorship-biased.
+  https://github.com/jkhee323-del/toss-close-scanner/actions/runs/42631053396
+- Existing next-day retrospective fixed-strategy cost audit:
+  https://github.com/jkhee323-del/toss-close-scanner/actions/runs/42630775465
+  Filtered historical signals: 1,625 events on 139 dates, 57.11% positive-hit.
+  Hypothetical compounded net +7.06% at 0.2% round-trip cost and -29.51%
+  at 0.5%; severe drawdown and unstable periods. Not independent, not live.
+  This experiment's flow features are NOT verified KR institution/foreign flow.
+
+### Remaining eight workstreams (lab progress versus production completion)
+1. Latest Windows V3.1 integration: NOT DONE, container archive execution failed.
+2. 1/3/6/12-month AI: research evaluation done; all 5y sampled gates FAILED.
+3. US cache safety: safeguards, audits and 5y opt-in done in lab; full cleanup NOT DONE.
+4. Institutional/foreign flow: optional data adapter and UI done; live provider NOT verified.
+5. True CVD: verified-aggressor tick algorithm done; real tick source NOT connected.
+6. Next-day accuracy: retrospective cost audit done; independent improvement NOT proven.
+7. Auto-refresh/UI: safeguards and missing-data labels done in lab; production verification NOT DONE.
+8. Final V3.1 integration/ZIP: 58 lab tests passed, full V3.1 tests and final ZIP NOT DONE.
+
+Do not merge into main or claim the V3.1 project is finished without new regression
+tests, provider validation, and deployment checks.

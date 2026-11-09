@@ -160,11 +160,16 @@ def _global_rows(ticker: str, name: str, country: str, df: pd.DataFrame) -> list
     return rows
 
 
-def update_global(*, history_period: str = "1y") -> None:
+def update_global(*, history_period: str = "1y", max_symbols: int = 0, dry_run: bool = False) -> None:
     """Refresh global price cache and precompute today/previous-3-day candidates."""
     if history_period not in {"1y", "5y"}:
         raise ValueError("Only 1y or 5y history periods are accepted")
-    GLOBAL_HISTORY.mkdir(parents=True, exist_ok=True)
+    if max_symbols < 0:
+        raise ValueError("max_symbols cannot be negative")
+    # Dry runs must not create output directories or modify cached data.
+    if not dry_run:
+        GLOBAL_HISTORY.mkdir(parents=True, exist_ok=True)
+    selected = list(GLOBAL_SCAN_UNIVERSE[:max_symbols] if max_symbols else GLOBAL_SCAN_UNIVERSE)
     rows: list[dict] = []
 
     def one(item):
@@ -177,12 +182,13 @@ def update_global(*, history_period: str = "1y") -> None:
         candidates = _global_rows(ticker, name, country, history)
         if not candidates:
             raise ValueError(f"{ticker}: insufficient valid indicator rows")
-        atomic_save_history(path, history)
+        if not dry_run:
+            atomic_save_history(path, history)
         return candidates
 
     failures = 0
     with ThreadPoolExecutor(max_workers=5) as ex:
-        futures = {ex.submit(one, item): item for item in GLOBAL_SCAN_UNIVERSE}
+        futures = {ex.submit(one, item): item for item in selected}
         for fut in as_completed(futures):
             item = futures[fut]
             try:
@@ -194,13 +200,14 @@ def update_global(*, history_period: str = "1y") -> None:
     if not rows:
         raise RuntimeError("No global candidates could be refreshed")
     # A provider outage must not publish a misleading partial market ranking.
-    if failures > max(2, len(GLOBAL_SCAN_UNIVERSE) // 4):
-        raise RuntimeError(f"Too many global data failures: {failures}/{len(GLOBAL_SCAN_UNIVERSE)}; previous candidate cache preserved")
+    if failures > max(2, len(selected) // 4):
+        raise RuntimeError(f"Too many global data failures: {failures}/{len(selected)}; previous candidate cache preserved")
     z = pd.DataFrame(rows)
     out = (z.sort_values(["day_offset", "candidate_score", "trading_value"], ascending=[True, False, False])
              .groupby("day_offset", group_keys=False).head(14).reset_index(drop=True))
-    atomic_write_table(GLOBAL_CACHE, out)
-    print(f"Global refresh: candidates={len(out)}, failed={failures}/{len(GLOBAL_SCAN_UNIVERSE)}")
+    if not dry_run and not max_symbols:
+        atomic_write_table(GLOBAL_CACHE, out)
+    print(f"Global refresh: candidates={len(out)}, failed={failures}/{len(selected)}, dry_run={dry_run}, max_symbols={max_symbols}")
 
 
 def main() -> None:
@@ -208,11 +215,16 @@ def main() -> None:
     ap.add_argument("--market", choices=["kr", "global", "all"], default="all")
     ap.add_argument("--history-period", choices=["1y", "5y"], default="1y",
                     help="Use 5y only for deliberate history backfill")
+    ap.add_argument("--max-symbols", type=int, default=0,
+                    help="Limit downloaded tickers; prevents publishing partial candidate table")
+    ap.add_argument("--dry-run", action="store_true",
+                    help="Validate downloads without writing any files")
     args = ap.parse_args()
     if args.market in {"kr", "all"}:
         update_korea()
     if args.market in {"global", "all"}:
-        update_global(history_period=args.history_period)
+        update_global(history_period=args.history_period,
+                      max_symbols=args.max_symbols, dry_run=args.dry_run)
 
 
 if __name__ == "__main__":

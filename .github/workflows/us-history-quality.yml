@@ -1,0 +1,33 @@
+name: US History Quality Audit
+
+on:
+  push:
+    branches: [lab-us-session-20261108]
+    paths:
+      - "src/us_history_audit.py"
+      - ".github/workflows/us-history-quality.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install data audit dependencies
+        run: python -m pip install pandas numpy
+      - name: Audit checked-in US price histories
+        run: python -m src.us_history_audit --history data/global_history --output reports/us_history_audit.json
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: us-history-quality-audit
+          path: reports/us_history_audit.json
+          retention-days: 14

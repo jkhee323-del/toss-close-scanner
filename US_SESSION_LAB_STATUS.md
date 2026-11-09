@@ -86,3 +86,46 @@ than the user's newer offline Windows V3.1 copy. These findings do not
 re-evaluate the four experimental .joblib models on that Windows copy. Before
 a new full-length US evaluation, obtain sufficiently long, corporate-action-
 reviewed, complete-session price histories and re-run purged forward tests.
+
+## 2026-11-09 later update — remaining task work
+
+### Added in the isolated experiment branch
+- Actual KRX institutional/foreign **daily net-buy cash flows**: optional fetch,
+  strict schema validation, atomic cache writes; missing is unknown, not zero.
+  No real KRX-source test has yet been completed.
+- **Verified aggressor-side tick CVD** calculation; does not equate daily
+  OHLCV or OBV with trade CVD; missing ticks => unavailable.
+- KR long-term scanner UI: displays flow amounts only when the publication
+  date matches the analyzed stock bar. Labels missing CVD appropriately.
+- Deliberate `--history-period 5y` for global refresh while retaining
+  one-year default; `--dry-run --max-symbols 1` permits a truly read-only
+  one-stock smoke check.
+- US historical CSV quality audit: bad quotes, duplicates, zero volume,
+  stale dates, per-horizon history-depth warnings; no source data modified.
+
+### Actual verification
+- Unit/integration suite: **56 passed** (Python 3.13):
+  https://github.com/jkhee323-del/toss-close-scanner/actions/runs/42630215701
+- US price-history audit:
+  https://github.com/jkhee323-del/toss-close-scanner/actions/runs/42629921855
+  - 66 catalogued US cache files validated; no structurally invalid histories.
+  - **Zero** held 300+ completed sessions required by the conservative
+    one-month single-series depth screen; larger horizon counts also zero.
+  - This is a different vintage of data than the newer Windows V3.1.
+- Live Yahoo read-only smoke (one ticker, five-year request):
+  https://github.com/jkhee323-del/toss-close-scanner/actions/runs/42630508779
+  - Network download and consistency checks succeeded.
+  - `git diff --exit-code` check succeeded, so tracked files were unchanged.
+
+### Still not done
+1. Latest offline Windows V3.1 ZIP cannot yet be extracted/edited in the
+   current container environment; **no V3.1 integration** is claimed.
+2. Historical existing corrupted US bars, full 5y verified backfill, split
+   adjustments, provider calendars and true live update deployment remain.
+3. Model accuracy has **not** passed an independent, profitable holdout;
+   the 1m/3m gates failed and longer horizons need additional data.
+4. Korea institutional/foreign flow provider has not been validated on
+   current live ticker sessions; CVD requires purchased/authorized trades
+   with verified aggressor side.
+5. Next-day return model improvements, final UX end-to-end check, production
+   gate and final ZIP are outstanding. Production `main` is unchanged.

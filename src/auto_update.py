@@ -59,7 +59,7 @@ def update_korea() -> None:
         try:
             old = validate_ohlcv(pd.read_csv(path), min_rows=70)
             last = pd.Timestamp(old["date"].max())
-            start = (last - pd.Timedelta(days=10)).strftime("%Y%m%d")
+            start = (last - timedelta(days=10)).strftime("%Y%m%d")
             raw = stock.get_market_ohlcv_by_date(start, end.strftime("%Y%m%d"), symbol)
             fresh = _normalize_kr(raw)
             if fresh.empty:

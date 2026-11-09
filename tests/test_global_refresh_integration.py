@@ -76,3 +76,41 @@ def test_many_failed_downloads_keep_previous_candidate_cache(tmp_path, monkeypat
     with pytest.raises(RuntimeError, match="Too many global data failures"):
         auto_update.update_global()
     assert cached.read_bytes() == original
+
+
+def test_provider_failure_gate_preserves_all_existing_price_histories(tmp_path, monkeypatch):
+    """A successful ticker must not partially publish when the batch is unsafe."""
+    from src import auto_update
+
+    folder = tmp_path / "global_history"
+    folder.mkdir()
+    aapl = folder / "AAPL.csv"
+    old = make_history(300)
+    old.to_csv(aapl, index=False)
+    original = aapl.read_bytes()
+    cached = tmp_path / "global_candidates.csv"
+    cached.write_text("symbol,score\nOLD,9\n", encoding="utf-8")
+    prior_candidates = cached.read_bytes()
+    monkeypatch.setattr(auto_update, "GLOBAL_HISTORY", folder)
+    monkeypatch.setattr(auto_update, "GLOBAL_CACHE", cached)
+    monkeypatch.setattr(auto_update, "GLOBAL_SCAN_UNIVERSE", [
+        ("AAPL", "Apple", "미국"),
+        ("MSFT", "Microsoft", "미국"),
+        ("NVDA", "Nvidia", "미국"),
+        ("GOOGL", "Alphabet", "미국"),
+    ])
+
+    def provider(ticker, *, country):
+        if ticker != "AAPL":
+            raise OSError("simulated vendor outage")
+        changed = old.tail(90).copy()
+        changed.loc[changed.index[-1], "close"] += 0.2
+        changed.loc[changed.index[-1], "high"] += 0.2
+        return changed
+
+    monkeypatch.setattr(auto_update, "_fetch_global", provider)
+    with pytest.raises(RuntimeError, match="Too many global data failures"):
+        auto_update.update_global()
+    assert aapl.read_bytes() == original
+    assert cached.read_bytes() == prior_candidates
+    assert sorted(p.name for p in folder.glob("*.csv")) == ["AAPL.csv"]

@@ -28,10 +28,21 @@ REQUIRED_PROOFS = (
 )
 
 
-def latest_csv_date(directory: Path) -> dict:
+def latest_csv_date(
+    directory: Path, *, as_of: date | None = None, freshness_days: int = 7,
+) -> dict:
+    """Validate every ticker's last session; one fresh file is not sufficient.
+
+    Only calendar freshness is tested; market holidays, delistings, suspensions
+    and per-exchange session finality require a separate source-of-truth audit.
+    """
     paths = sorted(directory.glob("*.csv")) if directory.is_dir() else []
+    now = as_of or date.today()
     dates = []
     issues = []
+    stale = []
+    future = []
+    fresh_files = 0
     for path in paths:
         try:
             date_column = pd.read_csv(path, usecols=["date"])["date"]
@@ -40,16 +51,31 @@ def latest_csv_date(directory: Path) -> dict:
                 raise ValueError("missing or invalid date")
             if isinstance(parsed.dtype, pd.DatetimeTZDtype):
                 raise ValueError("timezone-aware session labels")
-            dates.append(pd.Timestamp(parsed.max()).date())
+            last = pd.Timestamp(parsed.max()).date()
+            dates.append(last)
+            age = (now - last).days
+            if age < 0:
+                future.append(path.name)
+            elif age > freshness_days:
+                stale.append(path.name)
+            else:
+                fresh_files += 1
         except (OSError, ValueError, KeyError, TypeError) as exc:
             issues.append(f"{path.name}: {exc}")
     return {
         "files": len(paths),
         "valid_files": len(dates),
         "latest_date": max(dates).isoformat() if dates else None,
-        "invalid_files": issues,
+        "earliest_last_date": min(dates).isoformat() if dates else None,
+        "fresh_files": fresh_files,
+        "fresh_fraction": round(fresh_files / len(paths), 5) if paths else 0.0,
+        "stale_count": len(stale),
+        "future_count": len(future),
+        "stale_sample": stale[:20],
+        "future_sample": future[:20],
+        "invalid_files": issues[:50],
+        "invalid_count": len(issues),
     }
-
 
 def check_release(
     root: Path, *, as_of: date, evidence: dict | None = None,
@@ -67,15 +93,19 @@ def check_release(
         ("kr", "data/history"),
         ("global", "data/global_history"),
     ):
-        record = latest_csv_date(root / relpath)
+        record = latest_csv_date(
+            root / relpath, as_of=as_of, freshness_days=freshness_days,
+        )
         caches[code] = record
-        last = date.fromisoformat(record["latest_date"]) if record["latest_date"] else None
         checks[f"{code}_cache_usable"] = (
             record["files"] > 0 and record["files"] == record["valid_files"]
-            and not record["invalid_files"]
+            and record["invalid_count"] == 0 and record["future_count"] == 0
         )
+        # Require >=95% of ticker caches to be fresh, not merely the latest
+        # file. The remaining 5% tolerance does not certify halted symbols.
         checks[f"{code}_cache_fresh"] = (
-            last is not None and 0 <= (as_of - last).days <= freshness_days
+            record["files"] > 0 and record["fresh_fraction"] >= 0.95
+            and record["invalid_count"] == 0 and record["future_count"] == 0
         )
     for key in REQUIRED_PROOFS:
         checks[key] = proof.get(key) is True

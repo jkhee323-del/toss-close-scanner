@@ -5,8 +5,10 @@ on:
     branches: [lab-us-session-20261108]
     paths:
       - ".github/workflows/build-experimental-lab-zip.yml"
-      - "src/auto_update.py"
-      - "tests/test_korean_refresh_safety.py"
+      - "src/**"
+      - "tests/**"
+      - "pages/**"
+      - "app.py"
       - "LAB_BUILD_NOT_FINAL.md"
   workflow_dispatch:
 
@@ -29,6 +31,25 @@ jobs:
         run: python -m compileall -q src tests pages app.py
       - name: Run regression test suite before packaging
         run: python -m pytest tests -q
+      - name: Record fail-closed release gate status
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        shell: bash
+        run: |
+          set +e
+          python -m src.release_gate --project . --output "$RUNNER_TEMP/release_preflight.json"
+          code=$?
+          set -e
+          if [ "$code" -ne 2 ]; then
+            echo "Expected experimental release to be blocked, got exit code $code"
+            exit 1
+          fi
+      - name: Upload release blockers alongside experimental ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: scanner-lab-release-blockers
+          path: ${{ runner.temp }}/release_preflight.json
+          retention-days: 14
       - name: Package the exact tested commit as an experimental archive
         shell: bash
         run: |

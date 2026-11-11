@@ -11,6 +11,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
+from src.cache_freshness import candidate_freshness, freshness_message
 from src.indicators import add_indicators
 from src.model import FEATURES
 from src.search import GLOBAL_SCAN_UNIVERSE, US_NAME_MAP, load_kr_listing, search_all, search_yahoo
@@ -18,6 +19,12 @@ from src.signals import compute_scored_window, floor_to_tick, pick_signals, targ
 from src.toss_client import TossClient
 
 st.set_page_config(page_title="종가매매 AI 스캐너 v9", page_icon="📈", layout="wide", initial_sidebar_state="collapsed")
+
+_cache_status = candidate_freshness(Path("data/global_candidates.csv"), stale_after_days=5)
+if _cache_status["state"] != "RECENT":
+    st.warning(freshness_message(_cache_status, market="해외 스캐너"))
+else:
+    st.caption(freshness_message(_cache_status, market="해외 스캐너"))
 
 RED, BLUE = "#e0383e", "#2b59d1"          # 한국식: 상승 = 빨강, 하락 = 파랑
 DAY_LABELS = ["오늘", "전일", "2일전", "3일전"]

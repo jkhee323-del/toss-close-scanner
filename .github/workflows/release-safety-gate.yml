@@ -1,0 +1,47 @@
+name: Release Safety Gate (experimental branch)
+
+on:
+  push:
+    branches: [lab-us-session-20261108]
+    paths:
+      - "src/release_gate.py"
+      - "tests/test_release_gate.py"
+      - ".github/workflows/release-safety-gate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install test requirements
+        run: python -m pip install pandas pytest
+      - name: Verify release gate contract
+        run: python -m pytest tests/test_release_gate.py -q
+      - name: Generate blocked release report (expected)
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          set +e
+          python -m src.release_gate --project . --output reports/release_preflight.json
+          status=$?
+          set -e
+          if [ "$status" -ne 2 ]; then
+            echo "Expected an explicit BLOCKED decision with exit code 2"
+            exit 1
+          fi
+          python -c "import json; p=json.load(open('reports/release_preflight.json')); assert p['release_decision']=='BLOCKED'; print('Blocked reasons:',p['blockers'])"
+      - name: Upload release blockers report
+        uses: actions/upload-artifact@v4
+        with:
+          name: scanner-release-blockers-not-approved
+          path: reports/release_preflight.json
+          retention-days: 14

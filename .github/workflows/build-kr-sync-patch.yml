@@ -1,0 +1,43 @@
+name: Build verified KRX sync fix patch
+
+on:
+  push:
+    branches: [fix-kr-cache-sync-20261111]
+    paths:
+      - ".github/workflows/build-kr-sync-patch.yml"
+      - ".github/workflows/update-korea.yml"
+      - "scripts/sync_kr_to_test.sh"
+      - "tests/test_kr_sync_workflow.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m pip install pytest
+      - name: Verify production error regression
+        run: python -m pytest tests/test_kr_sync_workflow.py -q
+      - name: Check script syntax
+        run: bash -n scripts/sync_kr_to_test.sh
+      - name: Package only changed workflow and reproducible test files
+        shell: bash
+        run: |
+          git archive --format=zip HEAD \
+            .github/workflows/update-korea.yml \
+            .github/workflows/verify-kr-sync-fix.yml \
+            scripts/sync_kr_to_test.sh \
+            tests/test_kr_sync_workflow.py > "$RUNNER_TEMP/toss-kr-sync-tested-patch.zip"
+          unzip -t "$RUNNER_TEMP/toss-kr-sync-tested-patch.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TOSS-KR-SYNC-TESTED-PATCH-NOT-FINAL-SCANNER
+          path: ${{ runner.temp }}/toss-kr-sync-tested-patch.zip
+          retention-days: 14

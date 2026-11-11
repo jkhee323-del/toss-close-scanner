@@ -75,3 +75,47 @@ def test_does_not_modify_any_csv(tmp_path):
     prior = path.read_bytes()
     _ = check_release(project, as_of=date(2026, 11, 11))
     assert path.read_bytes() == prior
+
+
+def test_one_recent_file_does_not_hide_old_ticker_data(tmp_path):
+    project = valid_project(tmp_path, "2026-11-02")
+    kr = project / "data" / "history"
+    for idx in range(1, 21):
+        pd.DataFrame({"date": ["2026-11-02"], "close": [100]}).to_csv(
+            kr / f"{idx:06d}.csv", index=False
+        )
+    pd.DataFrame({"date": ["2026-11-11"], "close": [100]}).to_csv(
+        kr / "005930.csv", index=False
+    )
+    report = check_release(project, as_of=date(2026, 11, 11))
+    assert report["cache"]["kr"]["latest_date"] == "2026-11-11"
+    assert report["cache"]["kr"]["fresh_files"] == 1
+    assert report["cache"]["kr"]["stale_count"] == 20
+    assert "kr_cache_fresh" in report["blockers"]
+
+
+def test_future_dated_quote_blocks_even_when_other_files_fresh(tmp_path):
+    project = valid_project(tmp_path, "2026-11-11")
+    kr = project / "data" / "history"
+    pd.DataFrame({"date": ["2026-11-12"], "close": [100]}).to_csv(
+        kr / "000001.csv", index=False
+    )
+    report = check_release(project, as_of=date(2026, 11, 11))
+    assert report["cache"]["kr"]["future_count"] == 1
+    assert "kr_cache_fresh" in report["blockers"]
+    assert "kr_cache_usable" in report["blockers"]
+
+
+def test_minimum_95_percent_coverage_required(tmp_path):
+    project = valid_project(tmp_path, "2026-11-11")
+    kr = project / "data" / "history"
+    for idx in range(2, 22):
+        pd.DataFrame({"date": ["2026-11-11"], "close": [100]}).to_csv(
+            kr / f"{idx:06d}.csv", index=False
+        )
+    pd.DataFrame({"date": ["2026-11-02"], "close": [100]}).to_csv(
+        kr / "000001.csv", index=False
+    )
+    result = check_release(project, as_of=date(2026, 11, 11))
+    assert result["cache"]["kr"]["fresh_fraction"] >= 0.95
+    assert result["checks"]["kr_cache_fresh"]

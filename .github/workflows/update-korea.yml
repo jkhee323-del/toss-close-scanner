@@ -43,26 +43,8 @@ jobs:
             git commit -m "Auto-update Korea market data"
             git push
           fi
-      - name: Sync global data to test site
+      - name: Sync Korean data to test site
         if: github.ref == 'refs/heads/main'
         run: |
           updated_main=$(git rev-parse HEAD)
-          git fetch origin accuracy-lab
-          git switch -C accuracy-lab origin/accuracy-lab
-          # data/history is required; a missing source must fail loudly.
-          if ! git cat-file -e "$updated_main:data/history" 2>/dev/null; then
-            echo "::error::KR history missing from the updated main commit"
-            exit 1
-          fi
-          git restore --source="$updated_main" --staged --worktree -- data/history
-          # The optional name cache may not be tracked in main. Never let its
-          # absence make an otherwise successful KRX refresh fail to sync.
-          if git cat-file -e "$updated_main:data/kr_names.csv" 2>/dev/null; then
-            git restore --source="$updated_main" --staged --worktree -- data/kr_names.csv
-          else
-            echo "No KR name cache in main; keeping the test branch copy unchanged."
-          fi
-          if ! git diff --cached --quiet; then
-            git commit -m "Auto-sync global data to test site"
-            git push origin HEAD:accuracy-lab
-          fi
+          bash scripts/sync_kr_to_test.sh "$updated_main" accuracy-lab

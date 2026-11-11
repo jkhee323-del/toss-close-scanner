@@ -5,6 +5,7 @@ import streamlit as st
 from src.long_term_scanner import HORIZONS, get_recommendations
 from src.search import load_kr_listing, US_NAME_MAP
 from src.kr_investor_flows import latest_flow_snapshot
+from src.cache_freshness import candidate_freshness, freshness_message
 
 
 st.set_page_config(
@@ -33,6 +34,12 @@ st.caption("한국 코스피·코스닥 | 대형주·중소형주 기술적 분�
 
 market = st.radio("투자 시장 선택", ["🇰🇷 한국", "🇺🇸 미국"], horizontal=True)
 market_code = "US" if market == "🇺🇸 미국" else "KR"
+if market_code == "US":
+    _cache_date = candidate_freshness("data/global_candidates.csv")
+    if _cache_date["state"] != "RECENT":
+        st.warning(freshness_message(_cache_date, market="미국·해외"))
+    else:
+        st.caption(freshness_message(_cache_date, market="미국·해외"))
 
 choice = st.selectbox(
     "투자 기간 선택",

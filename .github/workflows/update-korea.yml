@@ -43,14 +43,8 @@ jobs:
             git commit -m "Auto-update Korea market data"
             git push
           fi
-      - name: Sync global data to test site
+      - name: Sync Korean data to test site
         if: github.ref == 'refs/heads/main'
         run: |
           updated_main=$(git rev-parse HEAD)
-          git fetch origin accuracy-lab
-          git switch -C accuracy-lab origin/accuracy-lab
-          git restore --source="$updated_main" --staged --worktree -- data/history data/kr_names.csv
-          if ! git diff --cached --quiet; then
-            git commit -m "Auto-sync global data to test site"
-            git push origin HEAD:accuracy-lab
-          fi
+          bash scripts/sync_kr_to_test.sh "$updated_main" accuracy-lab

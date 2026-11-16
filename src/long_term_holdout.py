@@ -68,7 +68,7 @@ def audit(history_dir: Path, start: str = "2025-01-01", top_n: int = 10, cost_ra
                 ret = realized_return(frame, signal_day, days, cost_rate)
                 if ret is None:
                     continue
-                scan = analyze_stock(path, days, as_of_date=str(signal_day.date()))
+                scan = analyze_stock(path, days, as_of_date=str(signal_day.date()), history_frame=frame)
                 if scan is None or scan["기준일"] != str(signal_day.date()):
                     continue
                 candidates.append((symbol, scan["점수"], ret))

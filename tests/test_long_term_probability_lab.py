@@ -38,4 +38,6 @@ def test_unmatured_labels_are_not_created(tmp_path):
     path = tmp_path / "000001.csv"
     df.to_csv(path, index=False)
     got = prepare_symbol(path, 240)
-    assert got.empty  # 240-day target requires 240 future bars after indicator warmup
+    assert not got.empty
+    assert got["date"].max() <= df["date"].iloc[-241]
+    assert (got["future_date"] <= df["date"].iloc[-1]).all()

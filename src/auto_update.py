@@ -107,6 +107,36 @@ def _fetch_global(ticker: str) -> pd.DataFrame:
     return out.dropna(subset=need[1:]).sort_values("date").reset_index(drop=True)
 
 
+def _validate_global_history(df: pd.DataFrame, ticker: str) -> pd.DataFrame:
+    """Reject broken or stale provider responses before overwriting cached prices."""
+    needed = ["date", "open", "high", "low", "close", "volume"]
+    if df is None or not all(c in df.columns for c in needed):
+        raise ValueError(f"{ticker}: missing required OHLCV columns")
+    out = df[needed].copy()
+    out["date"] = pd.to_datetime(out["date"], errors="coerce", utc=True).dt.tz_localize(None)
+    for col in needed[1:]:
+        out[col] = pd.to_numeric(out[col], errors="coerce")
+    if out[needed].isna().any().any():
+        raise ValueError(f"{ticker}: missing OHLCV values")
+    out = out.sort_values("date")
+    if out["date"].duplicated().any():
+        raise ValueError(f"{ticker}: duplicate session dates")
+    if len(out) < 70:
+        raise ValueError(f"{ticker}: too few price observations")
+    if (out[["open", "high", "low", "close"]] <= 0).any().any() or (out["volume"] < 0).any():
+        raise ValueError(f"{ticker}: invalid prices or volume")
+    if ((out["high"] < out[["open", "close", "low"]].max(axis=1)) |
+        (out["low"] > out[["open", "close", "high"]].min(axis=1))).any():
+        raise ValueError(f"{ticker}: inconsistent OHLC")
+    now = pd.Timestamp.now(tz="UTC").tz_localize(None)
+    latest = out["date"].iloc[-1]
+    if latest > now + pd.Timedelta(days=1):
+        raise ValueError(f"{ticker}: future-dated prices")
+    if now - latest > pd.Timedelta(days=7):
+        raise ValueError(f"{ticker}: stale prices ending {latest.date()}")
+    return out.reset_index(drop=True)
+
+
 def _technical_score(row: pd.Series) -> float:
     score = 50.0
     score += max(-10, min(10, float(row["ret_5d"]) * 100 * 1.5))
@@ -160,10 +190,13 @@ def update_global() -> None:
 
     def one(item):
         ticker, name, country = item
-        df = _fetch_global(ticker)
+        df = _validate_global_history(_fetch_global(ticker), ticker)
+        candidates = _global_rows(ticker, name, country, df)
+        if len(candidates) != 4:
+            raise ValueError(f"{ticker}: incomplete candidate history")
         safe = ticker.replace("/", "_")
         df.to_csv(GLOBAL_HISTORY / f"{safe}.csv", index=False, encoding="utf-8-sig")
-        return _global_rows(ticker, name, country, df)
+        return candidates
 
     failures = 0
     with ThreadPoolExecutor(max_workers=5) as ex:
@@ -176,8 +209,11 @@ def update_global() -> None:
                 failures += 1
                 print(f"[WARN] {item[0]}: {exc}")
 
-    if not rows:
-        raise RuntimeError("No global candidates could be refreshed")
+    expected = len(GLOBAL_SCAN_UNIVERSE)
+    succeeded = expected - failures
+    # Do not replace a previously usable candidate cache with a partial outage.
+    if not rows or succeeded < max(1, int(expected * 0.7)):
+        raise RuntimeError(f"Global feed incomplete: {succeeded}/{expected} symbols refreshed")
     z = pd.DataFrame(rows)
     out = (z.sort_values(["day_offset", "candidate_score", "trading_value"], ascending=[True, False, False])
              .groupby("day_offset", group_keys=False).head(14).reset_index(drop=True))

@@ -24,9 +24,9 @@ HORIZONS = {
 }
 
 
-def analyze_stock(path: Path, horizon: int, as_of_date: str | None = None):
+def analyze_stock(path: Path, horizon: int, as_of_date: str | None = None, history_frame: pd.DataFrame | None = None):
     try:
-        df = pd.read_csv(path)
+        df = history_frame.copy() if history_frame is not None else pd.read_csv(path)
 
         required = {"date", "open", "high", "low", "close", "volume"}
         if not required.issubset(df.columns):

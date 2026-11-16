@@ -56,3 +56,17 @@ def test_global_partial_outage_preserves_candidate_cache(tmp_path, monkeypatch):
     with pytest.raises(RuntimeError, match="Global feed incomplete"):
         updater.update_global()
     assert cache.read_text(encoding="utf-8") == "original-cache"
+
+
+def test_global_download_preserves_tokyo_exchange_session_date(monkeypatch):
+    import sys
+    from types import SimpleNamespace
+
+    session = pd.Timestamp("2026-11-13", tz="Asia/Tokyo")
+    raw = pd.DataFrame({
+        "Open": [100.0], "High": [105.0], "Low": [99.0],
+        "Close": [101.0], "Volume": [1000],
+    }, index=pd.DatetimeIndex([session], name="Date"))
+    monkeypatch.setitem(sys.modules, "yfinance", SimpleNamespace(download=lambda *args, **kwargs: raw))
+    result = updater._fetch_global("7203.T")
+    assert result["date"].iloc[0] == pd.Timestamp("2026-11-13")

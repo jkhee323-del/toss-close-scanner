@@ -48,7 +48,7 @@ top_n = st.slider(
     value=10,
     step=1,
 )
-st.caption(f"확인용: 기간={choice}, 기간명={name}, 추천수={top_n}")
+st.caption("기술적 점수는 상승 확률이 아니며, 분석 기준일을 반드시 확인하세요.")
 
 run_analysis = st.button("🔍 선택한 조건으로 분석 실행", type="primary")
 
@@ -185,9 +185,17 @@ else:
 
 
 
-    st.subheader(f"🧪 확인 제목: {choice} / {HORIZONS[choice][0]} / TOP {top_n}")
+    st.subheader(f"{HORIZONS[choice][0]} 추천 종목 TOP {top_n}")
 
 
+
+    latest_session = pd.to_datetime(result["기준일"].iloc[0], errors="coerce")
+    today_local = pd.Timestamp.now(tz="Asia/Seoul").tz_localize(None).normalize()
+    if pd.isna(latest_session) or latest_session + pd.offsets.BDay(5) < today_local:
+        st.warning(
+            "저장된 시세가 최근 거래일보다 오래되었을 수 있습니다. "
+            "자동갱신 상태를 확인하기 전에는 추천 결과를 실시간 신호로 해석하지 마세요."
+        )
 
     result = result.head(top_n).copy()
 

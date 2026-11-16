@@ -103,7 +103,7 @@ def _fetch_global(ticker: str) -> pd.DataFrame:
     raw = raw.reset_index().rename(columns={"Date": "date", "Open": "open", "High": "high", "Low": "low", "Close": "close", "Volume": "volume"})
     need = ["date", "open", "high", "low", "close", "volume"]
     out = raw[need].copy()
-    out["date"] = pd.to_datetime(out["date"], utc=True).dt.tz_localize(None)
+    out["date"] = pd.to_datetime(out["date"]).dt.tz_localize(None).dt.normalize()
     return out.dropna(subset=need[1:]).sort_values("date").reset_index(drop=True)
 
 

@@ -24,7 +24,7 @@ HORIZONS = {
 }
 
 
-def analyze_stock(path: Path, horizon: int):
+def analyze_stock(path: Path, horizon: int, as_of_date: str | None = None):
     try:
         df = pd.read_csv(path)
 
@@ -42,6 +42,11 @@ def analyze_stock(path: Path, horizon: int):
             .sort_values("date")
             .drop_duplicates("date")
         )
+
+        if as_of_date is not None:
+            cutoff = pd.Timestamp(as_of_date)
+            # All indicators and momentum must use history available by the signal date.
+            df = df.loc[df["date"] <= cutoff].copy()
 
         # Reject invalid OHLCV rows rather than generating infinite scores.
         if (df[["open", "high", "low", "close"]] <= 0).any().any():

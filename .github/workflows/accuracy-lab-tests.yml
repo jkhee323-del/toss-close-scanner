@@ -4,8 +4,10 @@ on:
   push:
     branches: [accuracy-lab]
     paths:
+      - "app.py"
       - "src/**"
       - "tests/**"
+      - "requirements.txt"
       - ".github/workflows/accuracy-lab-tests.yml"
   workflow_dispatch:
 
@@ -15,16 +17,18 @@ permissions:
 jobs:
   pytest:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: pip
-      - name: Install test dependencies
+      - name: Install project and test dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install pytest pandas numpy finance-datareader
+          python -m pip install -r requirements.txt pytest
+      - name: Check Python syntax
+        run: python -m compileall -q app.py src tests
       - name: Run scanner regression tests
         run: python -m pytest tests/ -q

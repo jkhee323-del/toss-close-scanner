@@ -37,6 +37,19 @@ def _normalize_kr(raw: pd.DataFrame) -> pd.DataFrame:
     return x.dropna(subset=needed).sort_values("date").reset_index(drop=True)
 
 
+def _latest_complete_kr_date(now: pd.Timestamp | None = None) -> pd.Timestamp:
+    """KRX daily bars are final only after the closing session settles."""
+    local_now = pd.Timestamp.now(tz="Asia/Seoul") if now is None else pd.Timestamp(now)
+    if local_now.tzinfo is None:
+        local_now = local_now.tz_localize("Asia/Seoul")
+    else:
+        local_now = local_now.tz_convert("Asia/Seoul")
+    cutoff = local_now.normalize().tz_localize(None)
+    if (local_now.hour, local_now.minute) < (16, 10):
+        cutoff -= pd.Timedelta(days=1)
+    return cutoff
+
+
 def update_korea() -> None:
     """Incrementally append the latest KRX trading days to every stored symbol."""
     KR_HISTORY.mkdir(parents=True, exist_ok=True)
@@ -44,29 +57,30 @@ def update_korea() -> None:
     if not paths:
         raise RuntimeError("data/history has no CSV files")
 
-    end = datetime.now() + timedelta(days=1)
+    cutoff = _latest_complete_kr_date()
+    end = cutoff + pd.Timedelta(days=1)
     ok = fail = unchanged = 0
     for i, path in enumerate(paths, 1):
         symbol = path.stem.zfill(6)
         try:
-            old = pd.read_csv(path, parse_dates=["date"]).sort_values("date")
+            original = pd.read_csv(path, parse_dates=["date"]).sort_values("date")
+            old = original.loc[original["date"].dt.normalize() <= cutoff].copy()
+            if old.empty:
+                raise ValueError("No completed KRX sessions in stored history")
             last = pd.Timestamp(old["date"].max())
-            # Re-fetch a small overlap to safely handle revisions/holidays.
+            # Re-fetch overlapping completed sessions to account for revisions.
             start = (last - pd.Timedelta(days=10)).strftime("%Y%m%d")
             raw = stock.get_market_ohlcv_by_date(start, end.strftime("%Y%m%d"), symbol)
             fresh = _normalize_kr(raw)
-            if fresh.empty:
-                unchanged += 1
-                continue
-            merged = pd.concat([old, fresh], ignore_index=True)
+            if not fresh.empty:
+                fresh = fresh.loc[fresh["date"].dt.normalize() <= cutoff].copy()
+            merged = pd.concat([old, fresh], ignore_index=True) if not fresh.empty else old
             merged["date"] = pd.to_datetime(merged["date"]).dt.tz_localize(None)
             merged = merged.drop_duplicates("date", keep="last").sort_values("date").tail(1200).reset_index(drop=True)
-            before = last.normalize()
+            before = pd.Timestamp(original["date"].max()).normalize()
             after = pd.Timestamp(merged["date"].max()).normalize()
-            # Always rewrite overlap only when values or date count changed.
-            old_cmp = old.tail(1200).reset_index(drop=True)
-            same = len(old_cmp) == len(merged) and old_cmp.equals(merged)
-            if same:
+            old_cmp = original.tail(1200).reset_index(drop=True)
+            if len(old_cmp) == len(merged) and old_cmp.equals(merged):
                 unchanged += 1
             else:
                 merged.to_csv(path, index=False, encoding="utf-8-sig")

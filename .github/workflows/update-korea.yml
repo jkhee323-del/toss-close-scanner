@@ -49,7 +49,7 @@ jobs:
           updated_main=$(git rev-parse HEAD)
           git fetch origin accuracy-lab
           git switch -C accuracy-lab origin/accuracy-lab
-          git restore --source="$updated_main" --staged --worktree -- data/history data/kr_names.csv
+          git restore --source="$updated_main" --staged --worktree -- data/history
           if ! git diff --cached --quiet; then
             git commit -m "Auto-sync global data to test site"
             git push origin HEAD:accuracy-lab

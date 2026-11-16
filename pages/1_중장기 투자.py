@@ -3,6 +3,7 @@ import pandas as pd
 import streamlit as st
 
 from src.long_term_scanner import HORIZONS, get_recommendations
+from src.investor_flow import fetch_investor_flows
 from src.search import load_kr_listing, US_NAME_MAP
 
 
@@ -51,6 +52,8 @@ top_n = st.slider(
 st.caption("기술적 점수는 상승 확률이 아니며, 분석 기준일을 반드시 확인하세요.")
 
 run_analysis = st.button("🔍 선택한 조건으로 분석 실행", type="primary")
+if run_analysis:
+    st.session_state["long_term_scan_active"] = True
 
 
 
@@ -75,7 +78,7 @@ def load_company_names():
 
     return dict(zip(listing["Code"], listing["Name"]))
 
-if not run_analysis:
+if not st.session_state.get("long_term_scan_active", False):
     st.stop()
 
 
@@ -248,6 +251,31 @@ else:
         "거래량 비율은 평균 거래량 대비 수준이며, "
         "OBV는 거래량 기반 추세 지표입니다."
     )
+
+    if market_code == "KR":
+        with st.expander("외국인·기관 순매수 (최근 20거래일, 실제 거래대금)"):
+            st.caption("한국거래소 투자자별 확정 데이터 사용 · 데이터는 오후 6시 이후 반영 · 점수에는 아직 미반영")
+            if st.checkbox("상위 10종목의 순매수 금액 조회", key="show_kr_investor_flow"):
+                flow_rows = []
+                for _, selected in result.head(10).iterrows():
+                    entry = {
+                        "기업명": selected["기업명"],
+                        "종목코드": selected["종목코드"],
+                        "수급 기준일": "조회 실패/자료 없음",
+                        "외국인 순매수(억원)": None,
+                        "기관 순매수(억원)": None,
+                    }
+                    try:
+                        data = fetch_investor_flows(selected["종목코드"], selected["기준일"])
+                        if data is not None:
+                            entry["수급 기준일"] = data["as_of"]
+                            entry["외국인 순매수(억원)"] = round(data["foreign_net_krw"] / 100_000_000, 2)
+                            entry["기관 순매수(억원)"] = round(data["institution_net_krw"] / 100_000_000, 2)
+                    except Exception:
+                        pass  # Keep unavailable values null, never silently report zero.
+                    flow_rows.append(entry)
+                st.dataframe(pd.DataFrame(flow_rows), hide_index=True, width="stretch")
+                st.caption("양수는 순매수, 음수는 순매도입니다. 거래소 제공 오류 시 자료 없음으로 표시합니다.")
 
 st.info(
     "이 점수는 기술적 분석 점수입니다. "

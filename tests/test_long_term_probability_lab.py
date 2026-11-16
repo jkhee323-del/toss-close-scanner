@@ -28,12 +28,12 @@ def test_holdout_targets_and_training_cutoff(tmp_path):
 
 def test_unmatured_labels_are_not_created(tmp_path):
     df = pd.DataFrame({
-        "date": pd.bdate_range("2024-01-01", periods=300),
-        "open": [100.0] * 300,
-        "high": [102.0] * 300,
-        "low": [99.0] * 300,
-        "close": [101.0] * 300,
-        "volume": [10000] * 300,
+        "date": pd.bdate_range("2024-01-01", periods=280),
+        "open": [100.0] * 280,
+        "high": [102.0] * 280,
+        "low": [99.0] * 280,
+        "close": [101.0] * 280,
+        "volume": [10000] * 280,
     })
     path = tmp_path / "000001.csv"
     df.to_csv(path, index=False)

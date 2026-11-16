@@ -44,11 +44,14 @@ def realized_return(df: pd.DataFrame, signal_date: pd.Timestamp, horizon: int, c
     return exit_price / entry - 1.0 - cost_rate
 
 
-def audit(history_dir: Path, start: str = "2025-01-01", top_n: int = 10, cost_rate: float = 0.002) -> pd.DataFrame:
+def audit(history_dir: Path, start: str = "2025-01-01", top_n: int = 10, cost_rate: float = 0.002, max_symbols: int | None = None) -> pd.DataFrame:
     if top_n <= 0 or cost_rate < 0:
         raise ValueError("top_n must be positive and cost_rate nonnegative")
     history = {}
-    for path in sorted(history_dir.glob("*.csv")):
+    paths = sorted(history_dir.glob("*.csv"))
+    if max_symbols is not None:
+        paths = paths[:max_symbols]
+    for path in paths:
         frame = _load_history(path)
         if not frame.empty:
             history[path.stem] = (path, frame)
@@ -97,10 +100,11 @@ def main():
     parser.add_argument("--history-dir", type=Path, default=Path("data/history"))
     parser.add_argument("--start", default="2025-01-01")
     parser.add_argument("--top", type=int, default=10)
+    parser.add_argument("--max-symbols", type=int, default=None)
     parser.add_argument("--cost", type=float, default=0.002, help="round-trip cost fraction")
     parser.add_argument("--output", type=Path, default=Path("data/experiments/long_term_holdout.csv"))
     args = parser.parse_args()
-    report = audit(args.history_dir, start=args.start, top_n=args.top, cost_rate=args.cost)
+    report = audit(args.history_dir, start=args.start, top_n=args.top, cost_rate=args.cost, max_symbols=args.max_symbols)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     report.to_csv(args.output, index=False)
     if report.empty:

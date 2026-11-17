@@ -22,4 +22,12 @@ jobs:
           cache: pip
       - run: python -m pip install -r requirements.txt
       - name: Verify actual KRX institutional and foreign flows
-        run: python -m src.investor_flow_smoke
+        env:
+          KRX_ID: ${{ secrets.KRX_ID }}
+          KRX_PW: ${{ secrets.KRX_PW }}
+        run: |
+          if [ -z "$KRX_ID" ] || [ -z "$KRX_PW" ]; then
+            echo "::error::KRX_ID and KRX_PW must be set as GitHub Actions secrets."
+            exit 1
+          fi
+          python -m src.investor_flow_smoke

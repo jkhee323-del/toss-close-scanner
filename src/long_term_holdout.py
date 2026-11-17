@@ -105,6 +105,27 @@ def audit(history_dir: Path, start: str = "2025-01-01", top_n: int = 10, cost_ra
     return pd.DataFrame(output)
 
 
+def summarize_completed_periods(report: pd.DataFrame) -> pd.DataFrame:
+    """Only fully matured portfolios qualify for aggregate performance claims."""
+    if report.empty:
+        return pd.DataFrame()
+    valid = report.loc[report["top_evaluated_count"] == report["top_n"]].copy()
+    summary = []
+    for horizon in sorted(report["horizon_days"].unique()):
+        all_periods = report.loc[report["horizon_days"] == horizon]
+        completed = valid.loc[valid["horizon_days"] == horizon]
+        summary.append({
+            "horizon_days": int(horizon),
+            "signal_periods": len(all_periods),
+            "fully_matured_periods": len(completed),
+            "excluded_incomplete_periods": len(all_periods) - len(completed),
+            "mean_return_completed_only": float(completed["top_mean_net_return"].mean()) if len(completed) else float("nan"),
+            "win_rate_completed_only": float(completed["top_win_rate"].mean()) if len(completed) else float("nan"),
+            "excess_return_completed_only": float(completed["excess_vs_universe"].mean()) if len(completed) else float("nan"),
+        })
+    return pd.DataFrame(summary)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--history-dir", type=Path, default=Path("data/history"))
@@ -117,12 +138,17 @@ def main():
     report = audit(args.history_dir, start=args.start, top_n=args.top, cost_rate=args.cost, max_symbols=args.max_symbols)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     report.to_csv(args.output, index=False)
+    summary = summarize_completed_periods(report)
+    summary_path = args.output.with_name(args.output.stem + "_matured_summary.csv")
+    summary.to_csv(summary_path, index=False)
     if report.empty:
-        print("No fully observed holding periods. No accuracy claim can be made.")
+        print("No evaluated signals. No accuracy claim can be made.")
     else:
-        print(report.groupby("horizon_days")[["top_mean_net_return", "top_win_rate", "excess_vs_universe", "top_coverage"]].mean().to_string())
-        print("WARNING: Missing exits are not replaced by later-maturing symbols; check coverage before interpreting returns.")
-    print(f"Saved {len(report)} evaluated month/horizon pairs to {args.output}")
+        print("COMPLETED portfolios only (every selected stock has a known exit):")
+        print(summary.to_string(index=False))
+        print("WARNING: survivorship bias, limited stock universe and correlated positions remain.")
+    print(f"Saved {len(report)} signal/horizon pairs to {args.output}")
+    print(f"Saved fully matured summary to {summary_path}")
 
 
 if __name__ == "__main__":

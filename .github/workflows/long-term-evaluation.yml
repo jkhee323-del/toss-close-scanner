@@ -8,6 +8,8 @@ on:
       - "src/long_term_holdout.py"
       - "src/long_term_probability_lab.py"
       - "src/long_term_scanner.py"
+      - "src/lab_sampling.py"
+      - "tests/test_lab_sampling.py"
       - "tests/test_long_term_holdout.py"
       - "tests/test_long_term_probability_lab.py"
   workflow_dispatch:

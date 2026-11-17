@@ -5,6 +5,8 @@ These are real net-purchase amounts (KRW), NOT estimated CVD.
 """
 from __future__ import annotations
 
+import os
+
 import pandas as pd
 
 
@@ -41,6 +43,10 @@ def summarize_investor_flows(raw: pd.DataFrame, end_date: pd.Timestamp, lookback
 
 def fetch_investor_flows(ticker: str, scan_date: str, lookback: int = 20) -> dict | None:
     """Fetch a bounded range and never use data after the scan's reference date."""
+    # pykrx KRX investor endpoints require credentials on the current provider.
+    # Never attempt anonymous login or report a missing response as zero flow.
+    if not (os.getenv("KRX_ID") and os.getenv("KRX_PW")):
+        raise RuntimeError("KRX investor flows require KRX_ID and KRX_PW environment secrets")
     from pykrx import stock
 
     if len(ticker) != 6 or not ticker.isdigit():

@@ -2,6 +2,7 @@
 
 This module NEVER overwrites production models or claims calibrated probabilities.
 Horizon targets are known only if the future exit date is observed.
+Signals are end-of-day, so returns use next-session open to horizon close.
 """
 from __future__ import annotations
 
@@ -42,8 +43,11 @@ def prepare_symbol(path: Path, horizon: int) -> pd.DataFrame:
     df = add_indicators(df.reset_index(drop=True))
     df["future_date"] = df["date"].shift(-horizon)
     future_close = df["close"].shift(-horizon)
-    df["future_net_return"] = future_close / df["close"] - 1 - COST
-    df["target"] = np.where(future_close.notna(), (df["future_net_return"] > 0).astype(float), np.nan)
+    # Signals are formed after the close: earliest executable entry is next open.
+    entry_open = df["open"].shift(-1)
+    df["future_net_return"] = future_close / entry_open - 1 - COST
+    valid_future = future_close.notna() & entry_open.notna() & (entry_open > 0)
+    df["target"] = np.where(valid_future, (df["future_net_return"] > 0).astype(float), np.nan)
     df["symbol"] = path.stem
     return df[["symbol", "date", "future_date", "future_net_return", "target"] + FEATURES].replace([np.inf, -np.inf], np.nan).dropna()
 

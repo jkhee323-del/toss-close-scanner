@@ -44,6 +44,31 @@ def realized_return(df: pd.DataFrame, signal_date: pd.Timestamp, horizon: int, c
     return exit_price / entry - 1.0 - cost_rate
 
 
+def rank_and_grade(candidates: list[tuple[str, float, float | None]], top_n: int) -> dict | None:
+    """Rank *before* inspecting later returns. Missing exits cannot promote other names."""
+    if len(candidates) < top_n:
+        return None
+    ranked = sorted(candidates, key=lambda item: (-item[1], item[0]))
+    top = ranked[:top_n]
+    observed = np.asarray([ret for _, _, ret in top if ret is not None], dtype=float)
+    benchmark = np.asarray([ret for _, _, ret in ranked if ret is not None], dtype=float)
+    # Do not silently report profits for unfinished holdings.
+    return {
+        "top_n": top_n,
+        "universe_count": len(ranked),
+        "top_evaluated_count": len(observed),
+        "top_unfinished_count": top_n - len(observed),
+        "universe_evaluated_count": len(benchmark),
+        "top_coverage": len(observed) / top_n,
+        "top_mean_net_return": float(observed.mean()) if len(observed) else float("nan"),
+        "top_median_net_return": float(np.median(observed)) if len(observed) else float("nan"),
+        "top_win_rate": float((observed > 0).mean()) if len(observed) else float("nan"),
+        "universe_mean_net_return": float(benchmark.mean()) if len(benchmark) else float("nan"),
+        "excess_vs_universe": float(observed.mean() - benchmark.mean()) if len(observed) and len(benchmark) else float("nan"),
+        "top_symbols": ",".join(symbol for symbol, _, _ in top),
+    }
+
+
 def audit(history_dir: Path, start: str = "2025-01-01", top_n: int = 10, cost_rate: float = 0.002, max_symbols: int | None = None) -> pd.DataFrame:
     if top_n <= 0 or cost_rate < 0:
         raise ValueError("top_n must be positive and cost_rate nonnegative")
@@ -67,31 +92,16 @@ def audit(history_dir: Path, start: str = "2025-01-01", top_n: int = 10, cost_ra
         for horizon_name, (_, days) in HORIZONS.items():
             candidates = []
             for symbol, (path, frame) in history.items():
-                # Require a tradable and fully observed future holding window.
-                ret = realized_return(frame, signal_day, days, cost_rate)
-                if ret is None:
-                    continue
+                # Rank on the signal date WITHOUT knowing which positions later mature.
                 scan = analyze_stock(path, days, as_of_date=str(signal_day.date()), history_frame=frame)
                 if scan is None or scan["기준일"] != str(signal_day.date()):
                     continue
+                ret = realized_return(frame, signal_day, days, cost_rate)
                 candidates.append((symbol, scan["점수"], ret))
-            if len(candidates) < top_n:
+            graded = rank_and_grade(candidates, top_n)
+            if graded is None:
                 continue
-            candidates.sort(key=lambda x: (-x[1], x[0]))
-            winners = candidates[:top_n]
-            selected = np.array([x[2] for x in winners], dtype=float)
-            full = np.array([x[2] for x in candidates], dtype=float)
-            output.append({
-                "signal_date": str(signal_day.date()),
-                "horizon_days": days,
-                "top_n": top_n,
-                "universe_count": len(candidates),
-                "top_mean_net_return": float(selected.mean()),
-                "top_median_net_return": float(np.median(selected)),
-                "top_win_rate": float((selected > 0).mean()),
-                "universe_mean_net_return": float(full.mean()),
-                "excess_vs_universe": float(selected.mean() - full.mean()),
-            })
+            output.append({"signal_date": str(signal_day.date()), "horizon_days": days, **graded})
     return pd.DataFrame(output)
 
 
@@ -110,7 +120,8 @@ def main():
     if report.empty:
         print("No fully observed holding periods. No accuracy claim can be made.")
     else:
-        print(report.groupby("horizon_days")[["top_mean_net_return", "top_win_rate", "excess_vs_universe"]].mean().to_string())
+        print(report.groupby("horizon_days")[["top_mean_net_return", "top_win_rate", "excess_vs_universe", "top_coverage"]].mean().to_string())
+        print("WARNING: Missing exits are not replaced by later-maturing symbols; check coverage before interpreting returns.")
     print(f"Saved {len(report)} evaluated month/horizon pairs to {args.output}")
 
 

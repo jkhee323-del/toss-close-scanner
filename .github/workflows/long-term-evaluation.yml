@@ -5,6 +5,11 @@ on:
     branches: [accuracy-lab]
     paths:
       - ".github/workflows/long-term-evaluation.yml"
+      - "src/long_term_holdout.py"
+      - "src/long_term_probability_lab.py"
+      - "src/long_term_scanner.py"
+      - "tests/test_long_term_holdout.py"
+      - "tests/test_long_term_probability_lab.py"
   workflow_dispatch:
 
 permissions:

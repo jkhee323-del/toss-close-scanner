@@ -41,22 +41,27 @@ def metrics(name, prob, frame):
     }
 
 
+def split_candidate_holdout(data: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Exclude labels maturing after the development cutoff."""
+    required = {"date", "next_date", "target"}
+    if not required.issubset(data.columns):
+        raise ValueError("required holdout date/label columns are missing")
+    train = data.loc[(data["date"] <= TRAIN_END) & (data["next_date"] <= TRAIN_END)].copy()
+    holdout = data.loc[data["date"] >= HOLDOUT_START].copy()
+    if train.empty or holdout.empty:
+        raise RuntimeError("empty train or holdout")
+    if train["next_date"].max() > TRAIN_END or train["date"].max() >= holdout["date"].min():
+        raise RuntimeError("time or next-day label split overlap")
+    return train, holdout
+
+
 def run():
     # Locked candidate: features/model/threshold were selected on 2024 validation.
     # Only widen raw label availability so later dates can be evaluated.
     exp.LABEL_DATA_END = pd.Timestamp("2100-01-01")
     data = exp.build_dataset(DATA_DIR)
 
-    # A signal on the last development day has a next-day label from holdout.
-    # Never allow that future outcome into the model's training sample.
-    train = data.loc[(data["date"] <= TRAIN_END) & (data["next_date"] <= TRAIN_END)].copy()
-    holdout = data.loc[data["date"] >= HOLDOUT_START].copy()
-    if train.empty or holdout.empty:
-        raise RuntimeError("empty train or holdout")
-    if train["next_date"].max() > TRAIN_END:
-        raise RuntimeError("next-day outcome leaks into training")
-    if train["date"].max() >= holdout["date"].min():
-        raise RuntimeError("time split overlap")
+    train, holdout = split_candidate_holdout(data)
 
     baseline = HistGradientBoostingClassifier(**HGB_BASELINE_PARAMS)
     candidate = make_pipeline(

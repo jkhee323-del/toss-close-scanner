@@ -27,6 +27,9 @@ def metrics(name, prob, frame):
     return {
         "model": name,
         "accuracy_pct": float(np.mean(signal == frame["target"].to_numpy()) * 100),
+        "market_up_rate_pct": float(frame["target"].mean() * 100),
+        "signal_precision_pct": float(s["target"].mean() * 100) if len(s) else None,
+        "idle_days": int(frame["date"].nunique() - s["date"].nunique()),
         "upward_hit_rate_pct": float(s["target"].mean() * 100) if len(s) else None,
         "signals": int(len(s)),
         "sample_coverage_pct": float(len(s) / len(frame) * 100),
@@ -44,10 +47,14 @@ def run():
     exp.LABEL_DATA_END = pd.Timestamp("2100-01-01")
     data = exp.build_dataset(DATA_DIR)
 
-    train = data.loc[data["date"] <= TRAIN_END].copy()
+    # A signal on the last development day has a next-day label from holdout.
+    # Never allow that future outcome into the model's training sample.
+    train = data.loc[(data["date"] <= TRAIN_END) & (data["next_date"] <= TRAIN_END)].copy()
     holdout = data.loc[data["date"] >= HOLDOUT_START].copy()
     if train.empty or holdout.empty:
         raise RuntimeError("empty train or holdout")
+    if train["next_date"].max() > TRAIN_END:
+        raise RuntimeError("next-day outcome leaks into training")
     if train["date"].max() >= holdout["date"].min():
         raise RuntimeError("time split overlap")
 

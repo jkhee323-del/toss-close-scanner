@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 
 from .long_term_scanner import HORIZONS, analyze_stock
+from .lab_sampling import sample_history_paths
 
 
 def _load_history(path: Path) -> pd.DataFrame:
@@ -73,9 +74,7 @@ def audit(history_dir: Path, start: str = "2025-01-01", top_n: int = 10, cost_ra
     if top_n <= 0 or cost_rate < 0:
         raise ValueError("top_n must be positive and cost_rate nonnegative")
     history = {}
-    paths = sorted(history_dir.glob("*.csv"))
-    if max_symbols is not None:
-        paths = paths[:max_symbols]
+    paths = sample_history_paths(list(history_dir.glob("*.csv")), max_symbols)
     for path in paths:
         frame = _load_history(path)
         if not frame.empty:

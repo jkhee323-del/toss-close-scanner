@@ -41,3 +41,23 @@ def test_unmatured_labels_are_not_created(tmp_path):
     assert not got.empty
     assert got["date"].max() <= df["date"].iloc[-241]
     assert (got["future_date"] <= df["date"].iloc[-1]).all()
+
+
+def test_model_target_uses_next_open_not_signal_close(tmp_path):
+    df = pd.DataFrame({
+        "date": pd.bdate_range("2024-01-01", periods=340),
+        "open": [100.0] * 340,
+        "high": [103.0] * 340,
+        "low": [97.0] * 340,
+        "close": [101.0] * 340,
+        "volume": [10000] * 340,
+    })
+    # The signal close is fixed, but the next-session open has a gap up.
+    df.loc[261, "open"] = 150.0
+    df.loc[261, "high"] = 155.0
+    path = tmp_path / "000001.csv"
+    df.to_csv(path, index=False)
+    result = prepare_symbol(path, 20)
+    row = result.loc[result["date"] == df.loc[260, "date"]].iloc[0]
+    assert row["future_net_return"] == pytest.approx(101.0 / 150.0 - 1 - 0.002)
+    assert row["target"] == 0

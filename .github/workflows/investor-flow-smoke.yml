@@ -1,0 +1,25 @@
+name: KRX Investor Flow Provider Smoke Test
+
+on:
+  push:
+    branches: [accuracy-lab]
+    paths:
+      - ".github/workflows/investor-flow-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: python -m pip install -r requirements.txt
+      - name: Verify actual KRX institutional and foreign flows
+        run: python -m src.investor_flow_smoke

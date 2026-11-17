@@ -25,3 +25,12 @@ def test_flow_missing_data_is_unavailable():
     assert summarize_investor_flows(pd.DataFrame(), pd.Timestamp("2026-11-16")) is None
     partial = pd.DataFrame({"기관합계": [1] * 8}, index=pd.bdate_range("2026-11-01", periods=8))
     assert summarize_investor_flows(partial, pd.Timestamp("2026-11-16")) is None
+
+
+def test_live_flow_fails_explicitly_without_secrets(monkeypatch):
+    import pytest
+    from src.investor_flow import fetch_investor_flows
+    monkeypatch.delenv("KRX_ID", raising=False)
+    monkeypatch.delenv("KRX_PW", raising=False)
+    with pytest.raises(RuntimeError, match="KRX_ID and KRX_PW"):
+        fetch_investor_flows("005930", "2026-11-13")

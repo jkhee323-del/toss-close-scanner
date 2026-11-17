@@ -15,6 +15,7 @@ from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.metrics import brier_score_loss, roc_auc_score
 
 from .indicators import add_indicators
+from .lab_sampling import sample_history_paths
 
 HORIZONS = (20, 60, 120, 240)
 FEATURES = [
@@ -92,9 +93,7 @@ def evaluate_horizon(dataset: pd.DataFrame, horizon: int) -> dict:
 
 
 def run_lab(history_dir: Path, max_symbols: int | None = None) -> pd.DataFrame:
-    paths = sorted(history_dir.glob("*.csv"))
-    if max_symbols is not None:
-        paths = paths[:max_symbols]
+    paths = sample_history_paths(list(history_dir.glob("*.csv")), max_symbols)
     outputs = []
     for horizon in HORIZONS:
         frames = [prepare_symbol(path, horizon) for path in paths]

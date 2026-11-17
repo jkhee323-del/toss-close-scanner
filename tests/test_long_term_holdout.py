@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 
 from src.long_term_scanner import analyze_stock
-from src.long_term_holdout import realized_return, rank_and_grade
+from src.long_term_holdout import realized_return, rank_and_grade, summarize_completed_periods
 
 
 def _history():
@@ -65,3 +65,17 @@ def test_unfinished_all_top_candidates_never_generate_phantom_returns():
     assert out["top_evaluated_count"] == 0
     assert pd.isna(out["top_mean_net_return"])
     assert pd.isna(out["top_win_rate"])
+
+
+def test_summary_uses_only_fully_matured_portfolios():
+    inputs = pd.DataFrame([
+        {"horizon_days": 20, "top_n": 2, "top_evaluated_count": 2,
+         "top_mean_net_return": 0.02, "top_win_rate": 0.5, "excess_vs_universe": 0.01},
+        {"horizon_days": 20, "top_n": 2, "top_evaluated_count": 1,
+         "top_mean_net_return": 0.99, "top_win_rate": 1.0, "excess_vs_universe": 0.80},
+    ])
+    summary = summarize_completed_periods(inputs).iloc[0]
+    assert summary["signal_periods"] == 2
+    assert summary["fully_matured_periods"] == 1
+    assert summary["excluded_incomplete_periods"] == 1
+    assert summary["mean_return_completed_only"] == pytest.approx(0.02)

@@ -61,3 +61,34 @@ def test_model_target_uses_next_open_not_signal_close(tmp_path):
     row = result.loc[result["date"] == df.loc[260, "date"]].iloc[0]
     assert row["future_net_return"] == pytest.approx(101.0 / 150.0 - 1 - 0.002)
     assert row["target"] == 0
+
+
+def test_prob_lab_does_not_bridge_bad_ohlcv(tmp_path):
+    frame = pd.DataFrame({
+        "date": pd.bdate_range("2023-01-02", periods=800),
+        "open": [100.0] * 800,
+        "high": [102.0] * 800,
+        "low": [99.0] * 800,
+        "close": [101.0] * 800,
+        "volume": [10000] * 800,
+    })
+    frame.loc[300, ["open", "high", "low", "close"]] = 0.0
+    path = tmp_path / "000001.csv"
+    frame.to_csv(path, index=False)
+    result = prepare_symbol(path, 20)
+    assert not result.empty
+    assert result["date"].min() > frame["date"].iloc[300]
+    assert (result["future_date"] > result["date"]).all()
+
+
+def test_prob_lab_rejects_insufficient_recent_history_after_corruption(tmp_path):
+    frame = pd.DataFrame({
+        "date": pd.bdate_range("2025-01-02", periods=300),
+        "open": [100.0] * 300, "high": [102.0] * 300,
+        "low": [99.0] * 300, "close": [101.0] * 300,
+        "volume": [10000] * 300,
+    })
+    frame.loc[299, "close"] = 0.0
+    path = tmp_path / "000001.csv"
+    frame.to_csv(path, index=False)
+    assert prepare_symbol(path, 20).empty

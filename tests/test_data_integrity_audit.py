@@ -109,3 +109,17 @@ def test_audit_separates_recently_usable_from_blocked_history(tmp_path):
     assert result["recoverable_recent_files"][0]["file"] == "recoverable.csv"
     assert result["blocked_recent_files"] == ["blocked.csv"]
     assert result["blocked_recent_count"] == 1
+
+
+def test_short_term_90_day_history_does_not_recover_65_days():
+    dates = pd.bdate_range("2025-01-01", periods=320)
+    frame = pd.DataFrame({
+        "date": dates, "open": [100.0] * 320,
+        "high": [101.0] * 320, "low": [99.0] * 320,
+        "close": [100.0] * 320, "volume": [10000] * 320,
+    })
+    frame.loc[229, "open"] = 0
+    assert len(recent_valid_segment(frame, minimum_rows=90)) == 90
+    assert recent_valid_segment(frame, minimum_rows=91).empty
+    frame.loc[254, "open"] = 0
+    assert recent_valid_segment(frame, minimum_rows=90).empty

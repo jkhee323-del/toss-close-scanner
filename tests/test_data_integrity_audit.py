@@ -1,7 +1,7 @@
 """Data integrity audit regression tests."""
 import pandas as pd
 
-from src.data_integrity_audit import inspect_market
+from src.data_integrity_audit import inspect_market, check_ohlcv_quality
 
 
 def create_history(path, *, dates=None, bad_price=False):
@@ -41,3 +41,22 @@ def test_reject_stale_subset(tmp_path):
     out = inspect_market(tmp_path, min_recent_share=0.80)
     assert out["status"] == "fail"
     assert out["lagged_count"] == 1
+
+
+def test_adjusted_price_one_unit_roundoff_not_hard_error(tmp_path):
+    path = tmp_path / "adjusted.csv"
+    create_history(path)
+    raw = pd.read_csv(path)
+    raw.loc[0, "high"] = 99.0  # maximum open or close is 100: one unit rounding
+    reason, roundoffs = check_ohlcv_quality(raw)
+    assert reason is None
+    assert roundoffs == 1
+
+
+def test_zero_candle_not_accepted_as_roundoff(tmp_path):
+    path = tmp_path / "zero.csv"
+    create_history(path)
+    raw = pd.read_csv(path)
+    raw.loc[0, ["open", "high", "low"]] = 0
+    reason, _ = check_ohlcv_quality(raw)
+    assert reason == "invalid OHLCV numbers"

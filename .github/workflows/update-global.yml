@@ -42,7 +42,9 @@ jobs:
             echo "No new global trading data."
           else
             git commit -m "Auto-update global market data"
-            git push
+            # Preserve later main commits made while the data fetch was running.
+            git pull --rebase origin main
+            git push origin HEAD:main
           fi
 
       - name: Sync global data to test site

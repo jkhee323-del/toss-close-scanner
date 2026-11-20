@@ -87,3 +87,25 @@ def test_recent_corrupted_candle_never_silently_bridged():
     assert recent_valid_segment(frame, minimum_rows=260).empty
     frame.loc[329, "open"] = 0
     assert recent_valid_segment(frame, minimum_rows=1).empty
+
+
+def test_audit_separates_recently_usable_from_blocked_history(tmp_path):
+    dates = pd.bdate_range("2024-01-01", periods=330)
+    template = pd.DataFrame({
+        "date": dates, "open": [100.0] * 330,
+        "high": [101.0] * 330, "low": [99.0] * 330,
+        "close": [100.0] * 330, "volume": [10000] * 330,
+    })
+    old = template.copy()
+    old.loc[5, ["open", "high", "low"]] = 0
+    old.to_csv(tmp_path / "recoverable.csv", index=False)
+    new = template.copy()
+    new.loc[329, "close"] = 0
+    new.to_csv(tmp_path / "blocked.csv", index=False)
+    template.to_csv(tmp_path / "good.csv", index=False)
+    result = inspect_market(tmp_path)
+    assert result["status"] == "fail"
+    assert result["recoverable_recent_count"] == 1
+    assert result["recoverable_recent_files"][0]["file"] == "recoverable.csv"
+    assert result["blocked_recent_files"] == ["blocked.csv"]
+    assert result["blocked_recent_count"] == 1

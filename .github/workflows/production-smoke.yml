@@ -12,6 +12,8 @@ on:
       - "src/indicators.py"
       - "src/auto_update.py"
       - "tests/test_global_refresh_safety.py"
+      - "tests/test_global_cache_validation.py"
+      - "src/global_cache_validation.py"
   workflow_dispatch:
 
 permissions:
@@ -31,6 +33,6 @@ jobs:
       - name: Check Streamlit and model Python syntax
         run: python -m compileall -q app.py src tests
       - name: Test global market provider validation and dates
-        run: python -m pytest tests/test_global_refresh_safety.py -q
+        run: python -m pytest tests/test_global_refresh_safety.py tests/test_global_cache_validation.py -q
       - name: Execute deployed KR model and all four date tabs
         run: python -m src.production_smoke

@@ -34,7 +34,7 @@ def inspect_market(history_dir: Path, *, min_recent_share: float = 0.80, max_lag
     """Inspect all cached histories, including schema, chronology and recent coverage."""
     files = sorted(history_dir.glob("*.csv"))
     if not files:
-        return {"status": "fail", "total": 0, "errors": ["no CSV histories found"]}
+        return {"status": "fail", "total": 0, "valid": 0, "errors": ["no CSV histories found"], "total_errors": 1, "excluded_files": []}
     issues = []
     last_dates = []
     rounding_adjustment_rows = 0
@@ -51,7 +51,7 @@ def inspect_market(history_dir: Path, *, min_recent_share: float = 0.80, max_lag
         except (OSError, ValueError, TypeError, pd.errors.ParserError) as exc:
             issues.append(f"{path.name}: unreadable ({type(exc).__name__})")
     if not last_dates:
-        return {"status": "fail", "total": len(files), "valid": 0, "errors": issues[:20], "total_errors": len(issues)}
+        return {"status": "fail", "total": len(files), "valid": 0, "errors": issues[:20], "total_errors": len(issues), "excluded_files": issues}
     # Date freshness measured against market's own latest observed session,
     # avoiding time-of-day and timezone assumptions about exchanges.
     latest = max(date for _, date in last_dates)
@@ -73,6 +73,7 @@ def inspect_market(history_dir: Path, *, min_recent_share: float = 0.80, max_lag
         "lagged_count": len(lagged),
         "lagged_examples": lagged[:10],
         "errors": issues[:20],
+        "excluded_files": issues,
         "total_errors": len(issues),
     }
 

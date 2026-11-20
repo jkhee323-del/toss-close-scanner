@@ -169,6 +169,8 @@ def build_dataset(data_dir: Path) -> pd.DataFrame:
         features = add_engineered_features(symbol_frame)
         features["next_date"] = features["date"].shift(-1)
         features["next_return"] = features["close"].shift(-1) / features["close"] - 1
+        features["next_open"] = features["open"].shift(-1)
+        features["execution_return"] = features["close"].shift(-1) / features["next_open"] - 1
         features["target"] = (features["next_return"] > 0).astype("int8")
         frames.append(features)
 
@@ -185,16 +187,18 @@ def build_dataset(data_dir: Path) -> pd.DataFrame:
 
     data = data.loc[data["next_date"] <= LABEL_DATA_END].copy()
     numeric_columns = list(dict.fromkeys(EXPANDED_FEATURES + OBV_FEATURES + FLOW_FEATURES + ["next_return", "target"]))
-    data[numeric_columns] = data[numeric_columns].replace([np.inf, -np.inf], np.nan)
+    data[numeric_columns + ["next_open", "execution_return"]] = data[numeric_columns + ["next_open", "execution_return"]].replace([np.inf, -np.inf], np.nan)
     required_columns = BASE_FEATURES + ["next_return", "target"]
     return data.dropna(subset=required_columns).reset_index(drop=True)
 
 
 def get_time_split(data: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
-    train = data.loc[data["date"] <= TRAIN_END].copy()
+    train = data.loc[(data["date"] <= TRAIN_END) & (data["next_date"] <= TRAIN_END)].copy()
     validation = data.loc[data["date"].between(VAL_START, VAL_END)].copy()
     if train.empty or validation.empty:
         raise ValueError("Fixed chronological Train/Validation split produced an empty partition")
+    if train["next_date"].max() > TRAIN_END:
+        raise ValueError("Training labels cross into the validation period")
     if train["date"].max() >= validation["date"].min():
         raise ValueError("Train and Validation date ranges overlap")
     if data["date"].max() > VAL_END or data["next_date"].max() > LABEL_DATA_END:

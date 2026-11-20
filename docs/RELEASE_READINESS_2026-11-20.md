@@ -1,68 +1,85 @@
-# Release readiness — 2026-11-20
+# Toss Close Scanner — release readiness, 2026-11-20
 
-**Decision: NOT READY for unconditional promotion from `accuracy-lab` to `main`.**
+**Status: targeted safety fixes released to `main`; full eight-phase experimental project NOT yet approved for general promotion.**
 
-This report records checks performed on experimental code without altering production
-trading models or rewriting historical market prices.
+This report distinguishes actual GitHub deployments, validated historical results,
+experiment-only features and external dependencies. No trading strategy is guaranteed
+profitable.
 
-## Verified
+## Production fixes completed
 
-- `main` Korean and overseas daily price refresh workflows reported successful
-  runs on 2026-11-19 (UTC timestamps of runs can differ from exchange session dates).
-- `accuracy-lab` test suite compiles Python sources and checks scanner regression tests.
-- International history integrity: **81/81 valid** in the new file-level audit.
-- Korean history integrity: **450/499 accepted**, **49 requiring review or exclusion**.
-  The original stricter audit flagged 82; 33 were reclassified after allowing
-  single-unit adjusted-price rounding. Do not substitute fabricated OHLC for
-  zero-price/suspended historical entries.
-- The short-term scanner in `accuracy-lab` now excludes invalid price-history files
-  and warns users when records are excluded.
-- The short-term research holdout now excludes labels that cross the training
-  cutoff. It additionally reports next-session open-to-close returns separately
-  from the close-to-close prediction target.
-- Experimental true CVD calculation requires explicit aggressor-side trade prints.
-  Optional user CSV analysis is isolated from automated production scans.
+- Korean close-scanner now rejects malformed history, uses only a contiguous clean
+  recent slice where possible, and shows the number of excluded stocks in the UI.
+  **90 uninterrupted sessions** are required for the short-term scoring path;
+  **241+ sessions** are required for long-horizon indicators.
+- Korean market latest saved completed session at last check: **2026-11-19**.
+- Live KR short scanner sample after the safe-history adjustment: **495 usable of
+  499 stored**, **45 historical series recovered**, **4 excluded**; all four signal
+  day tabs work. This does NOT imply 499 historical files are clean.
+- The overseas Yahoo price ingestion now selects the requested ticker explicitly
+  from multi-index columns and rejects duplicate/malformed OHLCV, stale provider
+  data and widespread provider outages. The prior concatenated ticker columns
+  observed in `META.csv` and `MSFT.csv` were successfully re-fetched and
+  repaired **without synthetic/fabricated prices**.
+- `global_candidates.csv` is now cross-checked against each ticker's own saved
+  close on each recommendation date. The latest verified batch contains **81
+  overseas histories and 56 cached recommendation rows**, all matching.
+  The last US history session at verification was **2026-11-18**; newer sessions
+  should not be assumed until the scheduled provider refresh actually obtains them.
+- The production interface disables cached overseas recommendations with an
+  explicit error if history/candidate correspondence fails.
+- Main and lab both have executable release smoke workflows; the production
+  workflow now tests global provider guards, foreign candidate prices, Korean
+  model inference and four date tabs.
 
-## Blocking items
+## Verified test links
 
-1. **KR historical remediation:** audit still fails on 49 files; inspect
-   `market-data-integrity-report` artifacts, review affected source rows,
-   validate against an authoritative data provider, and re-run the gate.
-   Do not silently forward-fill or overwrite disputed prices.
-2. **KRX investor flow:** live API smoke tests failed because KRX credentials
-   were not provided to the job. Configure `KRX_ID` and `KRX_PW` only as
-   GitHub Actions/deployment secrets and confirm authorized provider access.
-   Avoid entering account secrets in issue comments or chat.
-3. **Trade-level CVD:** no licensed, signed trade feed has been attached.
-   CSV-based manual CVD is experimental, not automatic live-market CVD.
-4. **Model quality:** prior 80-symbol holdout did not establish long-term model
-   improvement. Do not label model scores as calibrated rise probabilities.
-   Compare executable next-open entry net returns before adopting short-term
-   strategy changes.
-5. **Deployment isolation:** `main` and `accuracy-lab` have substantial
-   independent commits and differing cached market files; do not blindly merge
-   full branches. Promote reviewed code changes selectively after checks.
+- [Production scanner smoke tests](https://github.com/jkhee323-del/toss-close-scanner/actions/workflows/production-smoke.yml)
+- [Experimental scanner smoke tests](https://github.com/jkhee323-del/toss-close-scanner/actions/workflows/release-smoke.yml)
+- [Accuracy-lab regression tests](https://github.com/jkhee323-del/toss-close-scanner/actions/workflows/accuracy-lab-tests.yml)
+- [Global data refresh and sync](https://github.com/jkhee323-del/toss-close-scanner/actions/workflows/update-global.yml)
+- [Market data integrity audit](https://github.com/jkhee323-del/toss-close-scanner/actions/workflows/data-integrity.yml)
 
-## Required acceptance checks for later release
+## Known blockers / not completed
 
-- All regression tests pass on the exact candidate commit.
-- All market data integrity errors are resolved, explicitly quarantined with
-  documented scope, or backed by verified vendor corrections.
-- US/KR final dates match completed exchange sessions, not unfinished candles.
-- Experimental trade metrics survive independent chronological out-of-sample
-  checking with transaction costs and next-open execution.
-- KRX flow retrieval and CVD feature visibility are disabled unless trustworthy
-  inputs and permissions exist.
-- Production deployment passes a smoke test for both market views, four date
-  tabs, stock selection, and price-chart rendering.
+1. **Archived Korean price history:** strict full-history audit still reports
+   **49 legacy files with invalid OHLCV** (including zero-price suspension
+   records and inconsistent adjusted prices). A valid recent suffix may be
+   tradable even though the archived source contains bad rows. These raw
+   historic records are NOT corrected or silently invented. Full-history
+   backtests and AI retraining need provider-level remediation or documented
+   exclusions.
+2. **KRX foreign/institutional net purchases:** current provider requires
+   authorized `KRX_ID` and `KRX_PW` secrets. Live smoke test failed without
+   credentials; the optional research UI remains feature-gated. Do not
+   enter secrets in chat or source control.
+3. **True intraday CVD:** calculation module and user-supplied signed-trade CSV
+   visualization exist in `accuracy-lab`, but no authorized automatic
+   aggressor-side trade feed has been supplied.
+4. **Predictive model quality:** 1/3/6/12-month experiments had weak AUCs and
+   did not outperform constant Brier-score baselines. Do not replace the
+   operational scoring model or call research scores calibrated probabilities.
+5. **Short-term trading outcome research:** on 2025-2026 retrospective signals,
+   HGB baseline outperformed two alternatives under the assumed next-session
+   open-to-close execution. These are hypothetical historical results with
+   simplified round-trip trading costs, not brokerage fills or an unseen
+   holdout. Further independent forward validation is necessary.
+6. **Site hosting:** passing GitHub tests establishes repository code/model
+   execution, not a visually inspected Streamlit deployment or a validated
+   broker execution environment.
 
-## GitHub Actions links
+## Operational safeguards
 
-- [Market data integrity](https://github.com/jkhee323-del/toss-close-scanner/actions/workflows/data-integrity.yml)
-- [Regression tests](https://github.com/jkhee323-del/toss-close-scanner/actions/workflows/accuracy-lab-tests.yml)
-- [Next-day experimental validation](https://github.com/jkhee323-del/toss-close-scanner/actions/workflows/next-day-accuracy-lab.yml)
-- [Long-term experimental validation](https://github.com/jkhee323-del/toss-close-scanner/actions/workflows/long-term-evaluation.yml)
-- [KRX investor feed smoke test](https://github.com/jkhee323-del/toss-close-scanner/actions/workflows/investor-flow-smoke.yml)
+- Never merge all of `accuracy-lab` into diverged `main`; copy only reviewed
+  and CI-tested fixes.
+- Never fix invalid OHLCV by automatic price interpolation or by treating
+  a suspended zero-price candle as a real transaction.
+- Require **both** global history schema validation and recommendation-to-ticker
+  price match after every refresh. The foreign refresh workflow now rebases
+  its data-only commit before pushing so concurrent main changes are preserved.
+- Keep experimental features opt-in, retain audit reports and ensure
+  non-synchronous upstream data is visibly labeled with its reference date.
+- Full release signoff remains blocked until the unresolved research, source
+  quality and authorized feed dependencies are satisfied.
 
-This is engineering research and data quality assurance, not financial advice
-or evidence of guaranteed trading performance.
+This document describes code checks and data hygiene, not investment advice.

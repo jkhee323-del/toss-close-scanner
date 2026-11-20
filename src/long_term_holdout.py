@@ -15,18 +15,22 @@ import pandas as pd
 
 from .long_term_scanner import HORIZONS, analyze_stock
 from .lab_sampling import sample_history_paths
+from .data_integrity_audit import check_ohlcv_quality
 
 
 def _load_history(path: Path) -> pd.DataFrame:
     df = pd.read_csv(path)
-    required = {"date", "open", "close"}
-    if not required.issubset(df.columns):
+    required = {"date", "open", "high", "low", "close", "volume"}
+    if not required.issubset(df.columns) or len(df.columns) != len(required):
         return pd.DataFrame()
     df["date"] = pd.to_datetime(df["date"], errors="coerce")
-    for key in ("open", "close"):
+    if df["date"].isna().any() or df["date"].duplicated().any():
+        return pd.DataFrame()
+    for key in required - {"date"}:
         df[key] = pd.to_numeric(df[key], errors="coerce")
-    df = df.dropna(subset=["date", "open", "close"]).sort_values("date").drop_duplicates("date")
-    return df.reset_index(drop=True)
+    # Preserve broken rows: earlier as-of signals must not be deleted simply
+    # because an invalid price appears at a later date.
+    return df.sort_values("date").reset_index(drop=True)
 
 
 def realized_return(df: pd.DataFrame, signal_date: pd.Timestamp, horizon: int, cost_rate: float = 0.002) -> float | None:
@@ -37,6 +41,12 @@ def realized_return(df: pd.DataFrame, signal_date: pd.Timestamp, horizon: int, c
     signal_index = int(matching[0])
     exit_index = signal_index + horizon
     if exit_index >= len(df):
+        return None
+    # Invalid observations during the holding period make the outcome
+    # unmeasurable. Never skip over suspension/zero-price days.
+    window = df.iloc[signal_index + 1:exit_index + 1]
+    issue, _ = check_ohlcv_quality(window)
+    if issue is not None:
         return None
     entry = float(df.iloc[signal_index + 1]["open"])
     exit_price = float(df.iloc[exit_index]["close"])

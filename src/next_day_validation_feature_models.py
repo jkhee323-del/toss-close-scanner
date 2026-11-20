@@ -13,6 +13,7 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
 from .indicators import add_indicators
+from .data_integrity_audit import check_ohlcv_quality
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -91,16 +92,25 @@ HGB_BASELINE_PARAMS: dict[str, object] = {
 
 def load_raw_history(data_dir: Path) -> pd.DataFrame:
     frames = []
+    rejected = 0
     for path in sorted(data_dir.glob("*.csv")):
         frame = pd.read_csv(path, parse_dates=["date"])
         if frame.empty:
             continue
+        # Validate only what was observable at the historical experiment cutoff.
         frame = frame.loc[frame["date"] <= LABEL_DATA_END].copy()
         if frame.empty:
+            continue
+        # Forbid broken inputs instead of dropping isolated candles and
+        # accidentally computing a next-day target across a suspended session.
+        problem, _ = check_ohlcv_quality(frame)
+        if problem is not None:
+            rejected += 1
             continue
         frame = frame.sort_values("date").reset_index(drop=True)
         frame["symbol"] = path.stem
         frames.append(frame)
+    print(f"Historical next-day training: excluded_invalid_histories={rejected}")
 
     if not frames:
         raise ValueError(f"No history rows found on or before {LABEL_DATA_END.date()} in {data_dir}")

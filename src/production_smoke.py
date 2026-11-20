@@ -5,6 +5,8 @@ from pathlib import Path
 import pandas as pd
 
 from .signals import compute_scored_window, pick_signals
+from .global_cache_validation import validate_global_candidates
+from .data_integrity_audit import inspect_market
 
 
 def run(data_dir: str | Path = "data") -> dict:
@@ -22,7 +24,15 @@ def run(data_dir: str | Path = "data") -> dict:
         top, eligible = pick_signals(window, day, 10, 0)
         if top.empty or eligible < 10:
             raise RuntimeError(f"No usable KR scanner candidates for day {day}")
+    overseas_health = inspect_market(data / "global_history")
+    if overseas_health["status"] != "pass":
+        raise RuntimeError(
+            f"Overseas market cache failed audit: {overseas_health.get('total_errors')} errors"
+        )
+    overseas_candidates = validate_global_candidates(data)
     result = {
+        "foreign_symbols_verified": overseas_health["valid"],
+        "foreign_candidates_verified": overseas_candidates["candidate_rows_verified"],
         "as_of": str(pd.Timestamp(meta["latest_date"]).date()),
         "valid_symbols": int(meta["training_symbols"]),
         "invalid_symbols_excluded": int(meta["excluded_invalid_histories"]),

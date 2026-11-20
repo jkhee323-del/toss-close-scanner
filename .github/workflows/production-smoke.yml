@@ -1,0 +1,29 @@
+name: Production Scanner Smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/production-smoke.yml"
+      - "src/signals.py"
+      - "src/data_integrity_audit.py"
+      - "src/production_smoke.py"
+      - "src/indicators.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: python -m pip install -r requirements.txt
+      - name: Execute deployed KR model and all four date tabs
+        run: python -m src.production_smoke

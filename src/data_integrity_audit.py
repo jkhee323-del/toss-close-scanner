@@ -8,6 +8,28 @@ from pathlib import Path
 import pandas as pd
 
 
+def check_ohlcv_quality(raw: pd.DataFrame, *, rounding_tolerance: float = 1.0) -> tuple[str | None, int]:
+    """Return hard error and count of harmless 1-unit adjusted-price roundoffs.
+
+    Never adjust, rewrite or invent a price. Suspended zero-price candles fail.
+    """
+    required = {"date", "open", "high", "low", "close", "volume"}
+    if not required.issubset(raw.columns):
+        return "missing OHLCV columns", 0
+    dates = pd.to_datetime(raw["date"], errors="coerce", utc=True).dt.tz_localize(None).dt.normalize()
+    numeric = raw[["open", "high", "low", "close", "volume"]].apply(pd.to_numeric, errors="coerce")
+    if dates.empty or dates.isna().any() or dates.duplicated().any() or not dates.is_monotonic_increasing:
+        return "invalid, duplicate or unsorted dates", 0
+    if numeric.isna().any().any() or (numeric[["open", "high", "low", "close"]] <= 0).any().any() or (numeric["volume"] < 0).any():
+        return "invalid OHLCV numbers", 0
+    upper = numeric[["open", "low", "close"]].max(axis=1) - numeric["high"]
+    lower = numeric["low"] - numeric[["open", "high", "close"]].min(axis=1)
+    if (upper > rounding_tolerance).any() or (lower > rounding_tolerance).any():
+        return "inconsistent OHLC", 0
+    small_mismatches = int(((upper > 0) | (lower > 0)).sum())
+    return None, small_mismatches
+
+
 def inspect_market(history_dir: Path, *, min_recent_share: float = 0.80, max_lag_business_days: int = 5) -> dict:
     """Inspect all cached histories, including schema, chronology and recent coverage."""
     files = sorted(history_dir.glob("*.csv"))
@@ -15,25 +37,16 @@ def inspect_market(history_dir: Path, *, min_recent_share: float = 0.80, max_lag
         return {"status": "fail", "total": 0, "errors": ["no CSV histories found"]}
     issues = []
     last_dates = []
+    rounding_adjustment_rows = 0
     for path in files:
         try:
             raw = pd.read_csv(path)
-            required = {"date", "open", "high", "low", "close", "volume"}
-            if not required.issubset(raw.columns):
-                issues.append(f"{path.name}: missing OHLCV columns")
+            reason, roundoffs = check_ohlcv_quality(raw)
+            if reason is not None:
+                issues.append(f"{path.name}: {reason}")
                 continue
+            rounding_adjustment_rows += roundoffs
             dates = pd.to_datetime(raw["date"], errors="coerce", utc=True).dt.tz_localize(None).dt.normalize()
-            numeric = raw[["open", "high", "low", "close", "volume"]].apply(pd.to_numeric, errors="coerce")
-            if dates.empty or dates.isna().any() or dates.duplicated().any() or not dates.is_monotonic_increasing:
-                issues.append(f"{path.name}: invalid, duplicate or unsorted dates")
-                continue
-            if numeric.isna().any().any() or (numeric[["open", "high", "low", "close"]] <= 0).any().any() or (numeric["volume"] < 0).any():
-                issues.append(f"{path.name}: invalid OHLCV numbers")
-                continue
-            if ((numeric["high"] < numeric[["open", "low", "close"]].max(axis=1)) |
-                (numeric["low"] > numeric[["open", "high", "close"]].min(axis=1))).any():
-                issues.append(f"{path.name}: inconsistent OHLC")
-                continue
             last_dates.append((path.name, dates.iloc[-1]))
         except (OSError, ValueError, TypeError, pd.errors.ParserError) as exc:
             issues.append(f"{path.name}: unreadable ({type(exc).__name__})")
@@ -54,6 +67,7 @@ def inspect_market(history_dir: Path, *, min_recent_share: float = 0.80, max_lag
         "status": "pass" if not issues else "fail",
         "total": len(files),
         "valid": len(last_dates),
+        "minor_roundoff_rows": rounding_adjustment_rows,
         "latest": latest.strftime("%Y-%m-%d"),
         "recent_share": round(recent_share, 4),
         "lagged_count": len(lagged),

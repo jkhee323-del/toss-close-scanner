@@ -12,6 +12,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from src.indicators import add_indicators
+from src.global_cache_validation import validate_global_candidates
 from src.model import FEATURES
 from src.search import GLOBAL_SCAN_UNIVERSE, US_NAME_MAP, load_kr_listing, search_all, search_yahoo
 from src.signals import compute_scored_window, floor_to_tick, pick_signals, target_prices
@@ -224,7 +225,14 @@ def load_us_chart(symbol: str, bars: int = 180):
         raw = yf.download(symbol, period="1y", interval="1d", auto_adjust=False, progress=False, threads=False)
         if raw is not None and not raw.empty:
             if isinstance(raw.columns, pd.MultiIndex):
-                raw.columns = [c[0] if isinstance(c, tuple) else c for c in raw.columns]
+                if symbol in raw.columns.get_level_values(-1):
+                    raw = raw.xs(symbol, axis=1, level=-1)
+                elif len(raw.columns.get_level_values(-1).unique()) == 1:
+                    raw = raw.droplevel(-1, axis=1)
+                else:
+                    raise ValueError("가격 응답에 다른 종목 열이 섞여 있습니다.")
+            if raw.columns.duplicated().any():
+                raise ValueError("중복 OHLCV 열을 가진 가격 응답입니다.")
             raw = raw.reset_index()
             raw = raw.rename(columns={"Date": "date", "Open": "open", "High": "high", "Low": "low", "Close": "close", "Volume": "volume"})
             need = ["date", "open", "high", "low", "close", "volume"]
@@ -577,6 +585,15 @@ S["m"] = market
 refresh_us = False
 if market == "us":
     refresh_us = c_act.button("🌎 해외 추천 새로 분석", use_container_width=True)
+    try:
+        validate_global_candidates("data")
+    except (ValueError, OSError, KeyError, pd.errors.ParserError) as exc:
+        st.error(
+            "저장된 해외 후보 가격과 종목별 원본 시세가 일치하지 않아 "
+            "해외 추천을 일시 중단했습니다. 안전한 해외 자동갱신이 완료된 후 다시 확인해주세요."
+        )
+        st.caption(f"데이터 검사: {exc}")
+        st.stop()
 
 # ── 데이터/선택 종목 결정 ───────────────────────────────────────────────────
 sel, chart, err = None, None, None

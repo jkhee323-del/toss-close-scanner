@@ -1,0 +1,29 @@
+name: Scanner Release Smoke Test
+
+on:
+  push:
+    branches: [accuracy-lab]
+    paths:
+      - ".github/workflows/release-smoke.yml"
+      - "src/release_smoke.py"
+      - "src/signals.py"
+      - "src/data_integrity_audit.py"
+      - "src/long_term_scanner.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: python -m pip install -r requirements.txt
+      - name: Check actual scanner model and KR US recommendation paths
+        run: python -m src.release_smoke

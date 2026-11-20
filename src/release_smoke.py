@@ -11,6 +11,8 @@ import pandas as pd
 
 from .long_term_scanner import get_recommendations
 from .signals import compute_scored_window, pick_signals
+from .global_cache_validation import validate_global_candidates
+from .data_integrity_audit import inspect_market
 
 
 def run_smoke(data: str | Path = "data") -> dict:
@@ -36,7 +38,13 @@ def run_smoke(data: str | Path = "data") -> dict:
         raise RuntimeError("KR or US medium-horizon scan is empty")
     if "기준일" not in long_kr or "기준일" not in long_us:
         raise RuntimeError("Missing reference dates")
+    global_health = inspect_market(data / "global_history")
+    if global_health["status"] != "pass":
+        raise RuntimeError(f"Overseas cache corrupted: {global_health.get('total_errors')} invalid histories")
+    global_rows = validate_global_candidates(data)
     result = {
+        "global_history_verified": global_health["valid"],
+        "global_candidates_verified": global_rows["candidate_rows_verified"],
         "kr_date": str(pd.Timestamp(meta["latest_date"]).date()),
         "kr_symbols": int(meta["training_symbols"]),
         "kr_corrupted_excluded": int(meta.get("excluded_invalid_histories", 0)),

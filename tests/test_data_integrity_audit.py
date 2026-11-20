@@ -1,7 +1,7 @@
 """Data integrity audit regression tests."""
 import pandas as pd
 
-from src.data_integrity_audit import inspect_market, check_ohlcv_quality
+from src.data_integrity_audit import inspect_market, check_ohlcv_quality, recent_valid_segment
 
 
 def create_history(path, *, dates=None, bad_price=False):
@@ -60,3 +60,30 @@ def test_zero_candle_not_accepted_as_roundoff(tmp_path):
     raw.loc[0, ["open", "high", "low"]] = 0
     reason, _ = check_ohlcv_quality(raw)
     assert reason == "invalid OHLCV numbers"
+
+
+def test_recovers_only_unbroken_suffix_after_old_invalid_prices():
+    dates = pd.bdate_range("2024-01-01", periods=330)
+    frame = pd.DataFrame({
+        "date": dates, "open": [100.0] * 330, "high": [101.0] * 330,
+        "low": [99.0] * 330, "close": [100.0] * 330,
+        "volume": [10000] * 330,
+    })
+    frame.loc[20, ["open", "high", "low"]] = 0
+    recent = recent_valid_segment(frame, minimum_rows=260)
+    assert len(recent) == 309
+    assert recent["date"].iloc[0] == dates[21]
+    assert recent["date"].iloc[-1] == dates[-1]
+
+
+def test_recent_corrupted_candle_never_silently_bridged():
+    dates = pd.bdate_range("2024-01-01", periods=330)
+    frame = pd.DataFrame({
+        "date": dates, "open": [100.0] * 330, "high": [101.0] * 330,
+        "low": [99.0] * 330, "close": [100.0] * 330,
+        "volume": [10000] * 330,
+    })
+    frame.loc[310, "close"] = 0
+    assert recent_valid_segment(frame, minimum_rows=260).empty
+    frame.loc[329, "open"] = 0
+    assert recent_valid_segment(frame, minimum_rows=1).empty

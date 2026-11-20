@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 
 from .indicators import add_indicators
-from .data_integrity_audit import check_ohlcv_quality
+from .data_integrity_audit import check_ohlcv_quality, recent_valid_segment
 from .model import FEATURES
 
 
@@ -67,15 +67,23 @@ def compute_scored_window(data_dir: str | Path = "data", n_days: int = 4):
     n_files = 0
     rejected_symbols = 0
     roundoff_rows = 0
+    recovered_recent_histories = 0
     keep = FEATURES + ["trading_value", "date", "open", "high", "low", "close", "volume"]
     for path in sorted((data_dir / "history").glob("*.csv")):
         try:
             df = pd.read_csv(path, parse_dates=["date"])
             quality_issue, rounded = check_ohlcv_quality(df)
             if quality_issue is not None:
-                rejected_symbols += 1
-                continue
-            roundoff_rows += rounded
+                # Old suspended/corporate-action records can be unusable while a
+                # sufficiently long, contiguous clean recent segment remains.
+                recent = recent_valid_segment(df, minimum_rows=260)
+                if recent.empty:
+                    rejected_symbols += 1
+                    continue
+                df = recent
+                recovered_recent_histories += 1
+            else:
+                roundoff_rows += rounded
             x = add_indicators(df.sort_values("date").reset_index(drop=True))
         except Exception:
             rejected_symbols += 1
@@ -132,6 +140,7 @@ def compute_scored_window(data_dir: str | Path = "data", n_days: int = 4):
         "training_rows": training_rows,
         "excluded_invalid_histories": rejected_symbols,
         "minor_roundoff_rows": roundoff_rows,
+        "recovered_recent_histories": recovered_recent_histories,
     }
     return w, meta
 

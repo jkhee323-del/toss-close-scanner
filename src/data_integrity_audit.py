@@ -30,6 +30,33 @@ def check_ohlcv_quality(raw: pd.DataFrame, *, rounding_tolerance: float = 1.0) -
     return None, small_mismatches
 
 
+def recent_valid_segment(raw: pd.DataFrame, *, minimum_rows: int = 260, rounding_tolerance: float = 1.0) -> pd.DataFrame:
+    """Return consecutive valid recent candles, without filling missing prices."""
+    cols = ["date", "open", "high", "low", "close", "volume"]
+    if minimum_rows < 1 or not set(cols).issubset(raw.columns) or raw.empty:
+        return pd.DataFrame()
+    work = raw[cols].copy()
+    work["date"] = pd.to_datetime(work["date"], errors="coerce", utc=True).dt.tz_localize(None)
+    for col in cols[1:]:
+        work[col] = pd.to_numeric(work[col], errors="coerce")
+    if work["date"].isna().any() or work["date"].duplicated().any():
+        return pd.DataFrame()
+    work = work.sort_values("date").reset_index(drop=True)
+    prices = work[cols[1:]]
+    valid = prices.notna().all(axis=1)
+    valid &= prices[["open", "high", "low", "close"]].gt(0).all(axis=1)
+    valid &= prices["volume"].ge(0)
+    upper = prices[["open", "low", "close"]].max(axis=1) - prices["high"]
+    lower = prices["low"] - prices[["open", "high", "close"]].min(axis=1)
+    valid &= upper.le(rounding_tolerance) & lower.le(rounding_tolerance)
+    if not bool(valid.iloc[-1]):
+        return pd.DataFrame()
+    rejected = work.index[~valid]
+    start = int(rejected.max()) + 1 if len(rejected) else 0
+    recent = work.iloc[start:].copy()
+    return recent.reset_index(drop=True) if len(recent) >= minimum_rows else pd.DataFrame()
+
+
 def inspect_market(history_dir: Path, *, min_recent_share: float = 0.80, max_lag_business_days: int = 5) -> dict:
     """Inspect all cached histories, including schema, chronology and recent coverage."""
     files = sorted(history_dir.glob("*.csv"))

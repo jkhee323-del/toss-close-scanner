@@ -83,3 +83,41 @@ profitable.
   quality and authorized feed dependencies are satisfied.
 
 This document describes code checks and data hygiene, not investment advice.
+
+## Additional validation: 2026-11-20 follow-up
+
+**New historical integrity protection (accuracy-lab only).**
+
+- Long-horizon probability training now rejects corrupted OHLCV and uses only a
+  sufficiently long clean trailing segment. It does not connect model returns
+  across suspended zero-price rows.
+- Historical long-term holdout retains malformed dates as actual observations
+  instead of dropping the row; any invalid OHLCV during a proposed holding
+  window makes its realized outcome **unavailable**, never an inferred profit.
+  Historical selection at an earlier as-of date is not affected by later
+  corrupted candles.
+- Next-day research `load_raw_history` drops whole invalid symbol histories
+  at the experimental label cutoff instead of silently removing damaged
+  rows and bridging nonadjacent sessions.
+- Regression suite at run 44658443034: **70 tests passed**.
+- The 80-symbol revised holdout at run 44658223216 passed. Model Brier losses
+  remained worse than the training-rate constant benchmark in all four
+  horizons; no production model swap was authorized.
+- Read-only source repair triage at run 44658464136 produced an attached CSV
+  with 49 flagged historical Korean files, each with bad row count, first/last
+  bad session, issue categories, and safe recent coverage: **45 usable for
+  short-horizon signals, 42 usable for long-horizon scans, 4 still excluded
+  from short-horizon signals**.
+- Production Korean auto-update workflow was updated to use
+  `git pull --rebase --autostash origin main` before pushing its data-only
+  commit to avoid collisions with independently committed code changes.
+  The subsequent workflow run 44658056039 completed successfully.
+
+**Unchanged external blockers:** trustworthy vendor-corrected archived prices,
+authorized KRX investor-flow credentials, licensed trade-level aggressor-side
+data for automatic CVD, and independent model improvement evidence. No old
+historical prices were fabricated or overwritten for this audit.
+
+**Actions:** [Regression tests](https://github.com/jkhee323-del/toss-close-scanner/actions/runs/44658443034),
+[Source repair inventory](https://github.com/jkhee323-del/toss-close-scanner/actions/runs/44658464136),
+[Long-term research holdout](https://github.com/jkhee323-del/toss-close-scanner/actions/runs/44658223216).

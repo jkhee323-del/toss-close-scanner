@@ -68,6 +68,7 @@ def compute_scored_window(data_dir: str | Path = "data", n_days: int = 4):
     rejected_symbols = 0
     roundoff_rows = 0
     recovered_recent_histories = 0
+    # Short-term model indicators need at most 60 sessions; require 90 clean bars.
     keep = FEATURES + ["trading_value", "date", "open", "high", "low", "close", "volume"]
     for path in sorted((data_dir / "history").glob("*.csv")):
         try:
@@ -76,7 +77,7 @@ def compute_scored_window(data_dir: str | Path = "data", n_days: int = 4):
             if quality_issue is not None:
                 # Old suspended/corporate-action records can be unusable while a
                 # sufficiently long, contiguous clean recent segment remains.
-                recent = recent_valid_segment(df, minimum_rows=260)
+                recent = recent_valid_segment(df, minimum_rows=90)
                 if recent.empty:
                     rejected_symbols += 1
                     continue

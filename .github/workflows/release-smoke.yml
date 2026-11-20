@@ -6,8 +6,12 @@ on:
     paths:
       - ".github/workflows/release-smoke.yml"
       - "src/release_smoke.py"
+      - "src/global_cache_validation.py"
+      - "tests/test_global_cache_validation.py"
       - "src/signals.py"
       - "src/data_integrity_audit.py"
+      - "data/global_history/**"
+      - "data/global_candidates.csv"
       - "src/long_term_scanner.py"
   workflow_dispatch:
 

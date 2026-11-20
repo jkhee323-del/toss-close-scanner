@@ -65,17 +65,26 @@ def inspect_market(history_dir: Path, *, min_recent_share: float = 0.80, max_lag
     issues = []
     last_dates = []
     rounding_adjustment_rows = 0
+    recoverable = []
+    blocked = []
     for path in files:
         try:
             raw = pd.read_csv(path)
             reason, roundoffs = check_ohlcv_quality(raw)
             if reason is not None:
                 issues.append(f"{path.name}: {reason}")
+                suffix = recent_valid_segment(raw, minimum_rows=260)
+                if suffix.empty:
+                    blocked.append(path.name)
+                else:
+                    recoverable.append({"file": path.name, "clean_rows": len(suffix),
+                                        "last_clean_date": str(suffix["date"].iloc[-1].date())})
                 continue
             rounding_adjustment_rows += roundoffs
             dates = pd.to_datetime(raw["date"], errors="coerce", utc=True).dt.tz_localize(None).dt.normalize()
             last_dates.append((path.name, dates.iloc[-1]))
         except (OSError, ValueError, TypeError, pd.errors.ParserError) as exc:
+            blocked.append(path.name)
             issues.append(f"{path.name}: unreadable ({type(exc).__name__})")
     if not last_dates:
         return {"status": "fail", "total": len(files), "valid": 0, "errors": issues[:20], "total_errors": len(issues), "excluded_files": issues}
@@ -95,6 +104,10 @@ def inspect_market(history_dir: Path, *, min_recent_share: float = 0.80, max_lag
         "total": len(files),
         "valid": len(last_dates),
         "minor_roundoff_rows": rounding_adjustment_rows,
+        "recoverable_recent_count": len(recoverable),
+        "recoverable_recent_files": recoverable,
+        "blocked_recent_count": len(blocked),
+        "blocked_recent_files": blocked,
         "latest": latest.strftime("%Y-%m-%d"),
         "recent_share": round(recent_share, 4),
         "lagged_count": len(lagged),

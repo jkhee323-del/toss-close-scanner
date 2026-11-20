@@ -593,6 +593,13 @@ if market == "kr":
         st.stop()
     names = dict(zip(listing["Code"], listing["Name"])) if not listing.empty else {}
     latest_date = meta["latest_date"]
+    invalid_count = int(meta.get("excluded_invalid_histories", 0))
+    recovered_count = int(meta.get("recovered_recent_histories", 0))
+    if invalid_count:
+        st.warning(
+            f"시세 품질 검사에서 {invalid_count}개 종목을 제외했습니다. "
+            f"과거 손상 구간 이후의 정상 거래 데이터로 {recovered_count}개 종목을 안전하게 분석 중입니다."
+        )
     sig, cand_count = pick_signals(window, day, top_n, min_value_100m * 100_000_000)
     day_date = meta["dates"].get(day, latest_date)
     if not sig.empty:

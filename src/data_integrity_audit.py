@@ -51,7 +51,7 @@ def inspect_market(history_dir: Path, *, min_recent_share: float = 0.80, max_lag
         except (OSError, ValueError, TypeError, pd.errors.ParserError) as exc:
             issues.append(f"{path.name}: unreadable ({type(exc).__name__})")
     if not last_dates:
-        return {"status": "fail", "total": len(files), "errors": issues[:20]}
+        return {"status": "fail", "total": len(files), "valid": 0, "errors": issues[:20], "total_errors": len(issues)}
     # Date freshness measured against market's own latest observed session,
     # avoiding time-of-day and timezone assumptions about exchanges.
     latest = max(date for _, date in last_dates)

@@ -37,6 +37,16 @@ def metrics(name, prob, frame):
         "trading_days": int(frame["date"].nunique()),
         "avg_signals_per_day": float(len(s) / frame["date"].nunique()),
         "avg_next_return_pct": float(s["next_return"].mean() * 100) if len(s) else None,
+        "avg_next_open_to_close_pct": (
+            float(s["execution_return"].dropna().mean() * 100)
+            if "execution_return" in s.columns and s["execution_return"].notna().any()
+            else None
+        ),
+        "avg_next_open_to_close_net_0_2pct": (
+            float(s["execution_return"].dropna().mean() * 100 - 0.2)
+            if "execution_return" in s.columns and s["execution_return"].notna().any()
+            else None
+        ),
         "median_next_return_pct": float(s["next_return"].median() * 100) if len(s) else None,
     }
 

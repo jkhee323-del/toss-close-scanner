@@ -79,3 +79,32 @@ def test_summary_uses_only_fully_matured_portfolios():
     assert summary["fully_matured_periods"] == 1
     assert summary["excluded_incomplete_periods"] == 1
     assert summary["mean_return_completed_only"] == pytest.approx(0.02)
+
+
+def test_backtest_does_not_jump_over_invalid_holding_day():
+    frame = _history()
+    signal = frame["date"].iloc[300]
+    frame.loc[309, ["open", "high", "low", "close"]] = 0.0
+    assert realized_return(frame, signal, 20) is None
+
+
+def test_future_corruption_does_not_change_past_scanner_signal(tmp_path):
+    frame = _history()
+    path = tmp_path / "005930.csv"
+    cutoff = frame["date"].iloc[299]
+    original = analyze_stock(path, 20, as_of_date=str(cutoff.date()), history_frame=frame)
+    assert original is not None
+    frame.loc[400, ["open", "high", "low", "close"]] = 0.0
+    actual = analyze_stock(path, 20, as_of_date=str(cutoff.date()), history_frame=frame)
+    assert actual == original
+
+
+def test_corrupted_date_cannot_be_discarded_from_backtest_history(tmp_path):
+    from src.long_term_holdout import _load_history
+    frame = _history()
+    frame.loc[100, ["open", "high", "low", "close"]] = 0.0
+    path = tmp_path / "005930.csv"
+    frame.to_csv(path, index=False)
+    loaded = _load_history(path)
+    assert len(loaded) == len(frame)
+    assert loaded.loc[100, "close"] == 0.0

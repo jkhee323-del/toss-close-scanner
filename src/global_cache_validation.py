@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import math
 
 import pandas as pd
 
@@ -33,6 +34,8 @@ def validate_global_candidates(root: str | Path = "data") -> dict:
                 raise ValueError(f"{symbol}: candidate session {date.date()} absent from history")
             actual = float(row.entry_price)
             expected = float(expected_close)
+            if not math.isfinite(actual) or not math.isfinite(expected):
+                raise ValueError(f"{symbol}: missing or nonfinite price on {date.date()}")
             if abs(actual - expected) > max(1e-5, abs(expected) * 1e-7):
                 raise ValueError(
                     f"{symbol}: candidate price {actual} differs from own history close {expected} "

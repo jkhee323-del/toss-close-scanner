@@ -52,3 +52,11 @@ def test_candidate_cross_ticker_price_contamination_rejected(tmp_path):
     cand.to_csv(tmp_path / "global_candidates.csv", index=False)
     with pytest.raises(ValueError, match="differs from own history"):
         validate_global_candidates(tmp_path)
+
+
+def test_nonfinite_price_cannot_be_silently_accepted(tmp_path):
+    _, cand = _fixture(tmp_path)
+    cand.loc[0, "entry_price"] = float("nan")
+    cand.to_csv(tmp_path / "global_candidates.csv", index=False)
+    with pytest.raises(ValueError, match="nonfinite price"):
+        validate_global_candidates(tmp_path)

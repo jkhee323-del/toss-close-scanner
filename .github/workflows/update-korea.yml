@@ -42,9 +42,10 @@ jobs:
             echo "No new KRX trading data."
           else
             git commit -m "Auto-update Korea market data"
-            git push
+            git pull --rebase --autostash origin main
+            git push origin HEAD:main
           fi
-      - name: Sync global data to test site
+      - name: Sync Korean data to test site
         if: github.ref == 'refs/heads/main'
         run: |
           updated_main=$(git rev-parse HEAD)

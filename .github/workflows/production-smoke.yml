@@ -8,6 +8,8 @@ on:
       - "app.py"
       - "src/signals.py"
       - "src/data_integrity_audit.py"
+      - "data/global_history/**"
+      - "data/global_candidates.csv"
       - "src/production_smoke.py"
       - "src/indicators.py"
       - "src/auto_update.py"

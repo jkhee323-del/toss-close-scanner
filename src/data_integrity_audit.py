@@ -16,6 +16,10 @@ def check_ohlcv_quality(raw: pd.DataFrame, *, rounding_tolerance: float = 1.0) -
     required = {"date", "open", "high", "low", "close", "volume"}
     if not required.issubset(raw.columns):
         return "missing OHLCV columns", 0
+    # pandas auto-renames duplicate CSV headers to open.1 / close.1.
+    # This previously hid concatenated prices from several tickers in one file.
+    if len(raw.columns) != len(required) or set(raw.columns) != required:
+        return "unexpected or duplicated OHLCV columns", 0
     dates = pd.to_datetime(raw["date"], errors="coerce", utc=True).dt.tz_localize(None).dt.normalize()
     numeric = raw[["open", "high", "low", "close", "volume"]].apply(pd.to_numeric, errors="coerce")
     if dates.empty or dates.isna().any() or dates.duplicated().any() or not dates.is_monotonic_increasing:

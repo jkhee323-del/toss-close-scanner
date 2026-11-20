@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 
 from .indicators import add_indicators
+from .data_integrity_audit import recent_valid_segment
 
 from .search import US_STOCKS
 
@@ -33,30 +34,15 @@ def analyze_stock(path: Path, horizon: int, as_of_date: str | None = None, histo
             return None
 
         df["date"] = pd.to_datetime(df["date"], errors="coerce")
-        for column in ("open", "high", "low", "close"):
-            df[column] = pd.to_numeric(df[column], errors="coerce")
-        df["volume"] = pd.to_numeric(df["volume"], errors="coerce")
-
-        df = (
-            df.dropna(subset=["date", "open", "high", "low", "close", "volume"])
-            .sort_values("date")
-            .drop_duplicates("date")
-        )
-
+        if df["date"].isna().any() or df["date"].duplicated().any():
+            return None
         if as_of_date is not None:
-            cutoff = pd.Timestamp(as_of_date)
-            # All indicators and momentum must use history available by the signal date.
-            df = df.loc[df["date"] <= cutoff].copy()
-
-        # Reject invalid OHLCV rows rather than generating infinite scores.
-        if (df[["open", "high", "low", "close"]] <= 0).any().any():
+            # Trim before validating: the future state of the market must not
+            # influence whether a historical stock was tradable at this date.
+            df = df.loc[df["date"] <= pd.Timestamp(as_of_date)].copy()
+        df = recent_valid_segment(df, minimum_rows=max(241, horizon + 1))
+        if df.empty:
             return None
-        if (df["volume"] < 0).any():
-            return None
-
-        if len(df) < max(241, horizon + 1):
-            return None
-
 
         # 기존 지표 계산 함수를 활용해 OBV와 거래대금 계산
         df = add_indicators(df)

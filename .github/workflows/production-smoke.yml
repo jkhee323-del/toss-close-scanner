@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/production-smoke.yml"
+      - "app.py"
       - "src/signals.py"
       - "src/data_integrity_audit.py"
       - "src/production_smoke.py"
@@ -25,5 +26,7 @@ jobs:
           python-version: "3.11"
           cache: pip
       - run: python -m pip install -r requirements.txt
+      - name: Check Streamlit and model Python syntax
+        run: python -m compileall -q app.py src
       - name: Execute deployed KR model and all four date tabs
         run: python -m src.production_smoke

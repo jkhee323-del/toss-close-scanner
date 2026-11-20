@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 
 from .indicators import add_indicators
+from .data_integrity_audit import check_ohlcv_quality, recent_valid_segment
 from .model import FEATURES
 
 
@@ -64,12 +65,28 @@ def compute_scored_window(data_dir: str | Path = "data", n_days: int = 4):
     parts: list[pd.DataFrame] = []
     training_rows = 0
     n_files = 0
+    rejected_symbols = 0
+    roundoff_rows = 0
+    recovered_recent_histories = 0
     keep = FEATURES + ["trading_value", "date", "open", "high", "low", "close", "volume"]
     for path in sorted((data_dir / "history").glob("*.csv")):
         try:
-            df = pd.read_csv(path, parse_dates=["date"]).sort_values("date").reset_index(drop=True)
-            x = add_indicators(df)
+            df = pd.read_csv(path, parse_dates=["date"])
+            quality_issue, rounded = check_ohlcv_quality(df)
+            if quality_issue is not None:
+                # Old suspended/corporate-action records can be unusable while a
+                # sufficiently long, contiguous clean recent segment remains.
+                recent = recent_valid_segment(df, minimum_rows=260)
+                if recent.empty:
+                    rejected_symbols += 1
+                    continue
+                df = recent
+                recovered_recent_histories += 1
+            else:
+                roundoff_rows += rounded
+            x = add_indicators(df.sort_values("date").reset_index(drop=True))
         except Exception:
+            rejected_symbols += 1
             continue
         n_files += 1
         valid = x[FEATURES].notna().all(axis=1)
@@ -121,6 +138,9 @@ def compute_scored_window(data_dir: str | Path = "data", n_days: int = 4):
         "dates": {int(v): pd.Timestamp(k) for k, v in offset.items()},
         "training_symbols": n_files,
         "training_rows": training_rows,
+        "excluded_invalid_histories": rejected_symbols,
+        "minor_roundoff_rows": roundoff_rows,
+        "recovered_recent_histories": recovered_recent_histories,
     }
     return w, meta
 

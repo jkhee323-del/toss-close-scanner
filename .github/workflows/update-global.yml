@@ -43,7 +43,8 @@ jobs:
           else
             git commit -m "Auto-update global market data"
             # Preserve later main commits made while the data fetch was running.
-            git pull --rebase origin main
+            git status --short
+            git pull --rebase --autostash origin main
             git push origin HEAD:main
           fi
 

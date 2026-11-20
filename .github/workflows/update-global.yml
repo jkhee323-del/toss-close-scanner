@@ -1,6 +1,10 @@
 name: Update global market data
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/update-global.yml"
   schedule:
     # 08:10 KST, Monday-Friday (23:10 UTC on the previous UTC date).
     # This is after the U.S. regular session close in both DST and standard time.

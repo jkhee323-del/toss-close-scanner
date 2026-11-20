@@ -5,6 +5,9 @@ on:
     branches: [accuracy-lab]
     paths:
       - ".github/workflows/data-integrity.yml"
+      - "src/data_integrity_audit.py"
+      - "tests/test_data_integrity_audit.py"
+      - "src/signals.py"
   workflow_dispatch:
 
 permissions:

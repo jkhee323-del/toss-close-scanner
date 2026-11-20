@@ -16,6 +16,7 @@ from sklearn.metrics import brier_score_loss, roc_auc_score
 
 from .indicators import add_indicators
 from .lab_sampling import sample_history_paths
+from .data_integrity_audit import recent_valid_segment
 
 HORIZONS = (20, 60, 120, 240)
 FEATURES = [
@@ -33,13 +34,10 @@ def prepare_symbol(path: Path, horizon: int) -> pd.DataFrame:
     needed = {"date", "open", "high", "low", "close", "volume"}
     if not needed.issubset(df.columns):
         return pd.DataFrame()
-    df["date"] = pd.to_datetime(df["date"], errors="coerce")
-    for col in needed - {"date"}:
-        df[col] = pd.to_numeric(df[col], errors="coerce")
-    df = df.dropna(subset=list(needed)).sort_values("date").drop_duplicates("date")
-    if len(df) < 260 or (df[["open", "high", "low", "close"]] <= 0).any().any():
-        return pd.DataFrame()
-    if (df["volume"] < 0).any():
+    # Never drop individual broken candles: doing so bridges a false price gap.
+    # Retain only a sufficiently long, uninterrupted valid history suffix.
+    df = recent_valid_segment(df, minimum_rows=max(260, horizon + 21))
+    if df.empty:
         return pd.DataFrame()
     df = add_indicators(df.reset_index(drop=True))
     df["future_date"] = df["date"].shift(-horizon)

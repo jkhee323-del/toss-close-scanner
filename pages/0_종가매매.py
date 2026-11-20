@@ -617,6 +617,12 @@ if market == "kr":
         st.stop()
     names = dict(zip(listing["Code"], listing["Name"])) if not listing.empty else {}
     latest_date = meta["latest_date"]
+    invalid_count = int(meta.get("excluded_invalid_histories", 0))
+    if invalid_count:
+        st.warning(
+            f"데이터 품질 검사에서 {invalid_count}개 한국 종목의 일봉 파일을 제외했습니다. "
+            "문제가 있는 가격으로 계산한 추천은 표시하지 않습니다."
+        )
     sig, cand_count = pick_signals(window, day, top_n, min_value_100m * 100_000_000)
     day_date = meta["dates"].get(day, latest_date)
     if not sig.empty:

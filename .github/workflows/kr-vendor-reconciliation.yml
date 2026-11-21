@@ -27,6 +27,9 @@ jobs:
       - name: Test vendor comparison and archive preservation
         run: python -m pytest tests/test_kr_vendor_reconciliation.py -q
       - name: Query independent KRX source for archived invalid rows
+        env:
+          KRX_ID: ${{ secrets.KRX_ID }}
+          KRX_PW: ${{ secrets.KRX_PW }}
         run: python -m src.kr_vendor_reconciliation
       - name: Upload review-only vendor comparison
         if: always()

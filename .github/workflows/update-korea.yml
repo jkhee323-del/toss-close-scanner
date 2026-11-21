@@ -33,6 +33,8 @@ jobs:
       - run: pip install -r requirements.txt
       - name: Refresh KRX history
         run: python -m src.auto_update --market kr
+      - name: Validate refreshed KR and global scanner data before committing
+        run: python -m src.production_smoke
       - name: Commit refreshed data
         run: |
           git config user.name "github-actions[bot]"

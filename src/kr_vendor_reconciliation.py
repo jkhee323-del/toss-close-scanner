@@ -179,11 +179,11 @@ def main() -> None:
     print("No production or archived market prices were changed.")
     if report.empty:
         raise SystemExit("No invalid histories found or no diagnostic rows produced")
+    # Only a valid replacement bar is evidence that an archived record might
+    # be repairable. Provider zeros/missing sessions are NOT positive evidence.
     confirmed = report["status"].isin([
         "vendor_valid_pending_manual_approval",
         "price_basis_review_required",
-        "provider_missing_session",
-        "provider_also_invalid",
     ]).sum()
     if not confirmed:
         raise SystemExit(

@@ -105,6 +105,15 @@ def compare_history(
     return findings
 
 
+def vendor_is_trustworthy(vendor: pd.DataFrame) -> bool:
+    """Reject blank/zero-only feeds (e.g., failed KRX login) before comparison."""
+    if vendor is None or vendor.empty or not set(NEEDED).issubset(vendor.columns):
+        return False
+    valid = vendor.apply(validate_vendor_row, axis=1)
+    # At least two genuine neighboring observations and most rows credible.
+    return bool(valid.sum() >= 2 and valid.mean() >= 0.80)
+
+
 def fetch_kr_vendor(symbol: str, first_bad: pd.Timestamp, last_bad: pd.Timestamp) -> pd.DataFrame:
     from pykrx import stock
     start = (first_bad - pd.Timedelta(days=12)).strftime("%Y%m%d")
@@ -135,6 +144,17 @@ def audit(
                 results.append({"symbol": symbol, "date": "", "status": "no_repairable_dates"})
                 continue
             provider = fetcher(symbol, days.min(), days.max())
+            if not vendor_is_trustworthy(provider):
+                results.append({
+                    "symbol": symbol,
+                    "date": "",
+                    "first_bad_date": str(days.min().date()),
+                    "last_bad_date": str(days.max().date()),
+                    "affected_rows": int(invalid.sum()),
+                    "status": "vendor_unavailable_or_untrusted",
+                    "error": "No sufficiently valid independent KRX bars; authentication or provider may be unavailable",
+                })
+                continue
             results.extend(compare_history(symbol, original, provider))
         except Exception as exc:
             results.append({"symbol": symbol, "date": "", "status": "provider_fetch_or_parse_error",

@@ -9,6 +9,10 @@ on:
       - "tests/test_kr_vendor_reconciliation.py"
   workflow_dispatch:
 
+concurrency:
+  group: kr-vendor-readonly-reconciliation
+  cancel-in-progress: true
+
 permissions:
   contents: read
 

@@ -5,6 +5,7 @@ import pandas as pd
 
 from src.kr_vendor_reconciliation import (
     audit, compare_history, invalid_row_mask, validate_vendor_row,
+    vendor_is_trustworthy,
 )
 
 
@@ -68,3 +69,28 @@ def test_negative_volume_and_invalid_high_are_detected():
     data.loc[2, "volume"] = -1
     data.loc[3, "high"] = 80
     assert invalid_row_mask(data).sum() == 2
+
+
+def test_login_failed_all_zero_vendor_is_untrusted(tmp_path):
+    good = _bars()
+    broken = good.copy()
+    broken.loc[10, ["open", "high", "low", "close"]] = 0
+    path = tmp_path / "000100.csv"
+    broken.to_csv(path, index=False)
+    all_zero = good.copy()
+    all_zero[["open", "high", "low", "close", "volume"]] = 0
+    assert not vendor_is_trustworthy(all_zero)
+    before = path.read_bytes()
+    out = audit(tmp_path, fetcher=lambda sym, first, last: all_zero)
+    assert len(out) == 1
+    assert out.iloc[0]["status"] == "vendor_unavailable_or_untrusted"
+    assert out.iloc[0]["affected_rows"] == 1
+    assert path.read_bytes() == before
+
+
+def test_vendor_missing_or_sparse_is_not_approved():
+    assert not vendor_is_trustworthy(pd.DataFrame())
+    one = _bars().iloc[:1].copy()
+    assert not vendor_is_trustworthy(one)
+    valid = _bars()
+    assert vendor_is_trustworthy(valid)

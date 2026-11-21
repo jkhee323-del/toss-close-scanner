@@ -1,5 +1,6 @@
 """KRX data refresh must not treat intraday volume as a completed session."""
 import pandas as pd
+import pytest
 from src import auto_update as updater
 
 
@@ -33,3 +34,48 @@ def test_kr_refresh_removes_incomplete_session(tmp_path, monkeypatch):
     result = pd.read_csv(path)
     assert result["date"].tolist() == ["2026-11-13"]
     assert result["volume"].tolist() == [5000]
+
+
+def test_stale_empty_krx_provider_fails_refresh(tmp_path, monkeypatch):
+    folder = tmp_path / "history"
+    folder.mkdir()
+    pd.DataFrame({
+        "date": ["2026-11-13"], "open": [100], "high": [103],
+        "low": [99], "close": [102], "volume": [5000],
+    }).to_csv(folder / "005930.csv", index=False)
+    monkeypatch.setattr(updater, "KR_HISTORY", folder)
+    monkeypatch.setattr(updater, "_latest_complete_kr_date", lambda: pd.Timestamp("2026-11-19"))
+    monkeypatch.setattr(updater.stock, "get_market_ohlcv_by_date", lambda *args: pd.DataFrame())
+    monkeypatch.setattr(updater.time, "sleep", lambda _: None)
+    with pytest.raises(RuntimeError, match="KRX provider may be unavailable"):
+        updater.update_korea()
+
+
+def test_recent_completed_friday_is_ok_on_weekend(tmp_path, monkeypatch):
+    folder = tmp_path / "history"
+    folder.mkdir()
+    pd.DataFrame({
+        "date": ["2026-11-20"], "open": [100], "high": [103],
+        "low": [99], "close": [102], "volume": [5000],
+    }).to_csv(folder / "005930.csv", index=False)
+    monkeypatch.setattr(updater, "KR_HISTORY", folder)
+    monkeypatch.setattr(updater, "_latest_complete_kr_date", lambda: pd.Timestamp("2026-11-20"))
+    monkeypatch.setattr(updater.stock, "get_market_ohlcv_by_date", lambda *args: pd.DataFrame())
+    monkeypatch.setattr(updater.time, "sleep", lambda _: None)
+    updater.update_korea()
+
+
+def test_krx_refresh_requires_broad_recent_coverage(tmp_path, monkeypatch):
+    folder = tmp_path / "history"
+    folder.mkdir()
+    for symbol, date in [("005930", "2026-11-19"), ("000001", "2026-11-13"), ("000002", "2026-11-13")]:
+        pd.DataFrame({
+            "date": [date], "open": [100], "high": [103],
+            "low": [99], "close": [102], "volume": [5000],
+        }).to_csv(folder / f"{symbol}.csv", index=False)
+    monkeypatch.setattr(updater, "KR_HISTORY", folder)
+    monkeypatch.setattr(updater, "_latest_complete_kr_date", lambda: pd.Timestamp("2026-11-19"))
+    monkeypatch.setattr(updater.stock, "get_market_ohlcv_by_date", lambda *args: pd.DataFrame())
+    monkeypatch.setattr(updater.time, "sleep", lambda _: None)
+    with pytest.raises(RuntimeError, match="only 33.3%"):
+        updater.update_korea()

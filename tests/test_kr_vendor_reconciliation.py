@@ -94,3 +94,16 @@ def test_vendor_missing_or_sparse_is_not_approved():
     assert not vendor_is_trustworthy(one)
     valid = _bars()
     assert vendor_is_trustworthy(valid)
+
+
+def test_missing_krx_secrets_return_explicit_status_without_fetch(tmp_path, monkeypatch):
+    monkeypatch.delenv("KRX_ID", raising=False)
+    monkeypatch.delenv("KRX_PW", raising=False)
+    original = _bars()
+    original.loc[7, ["open", "high", "low", "close"]] = 0
+    path = tmp_path / "000100.csv"
+    original.to_csv(path, index=False)
+    original_bytes = path.read_bytes()
+    report = audit(tmp_path)
+    assert report.iloc[0]["status"] == "krx_credentials_missing"
+    assert path.read_bytes() == original_bytes

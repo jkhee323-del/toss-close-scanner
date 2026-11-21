@@ -1,12 +1,8 @@
 name: Archived Korean Vendor Reconciliation
 
+# Manual run only: requires authorized KRX provider credentials.
+# Do not generate noisy failed provider checks on every laboratory code change.
 on:
-  push:
-    branches: [accuracy-lab]
-    paths:
-      - ".github/workflows/kr-vendor-reconciliation.yml"
-      - "src/kr_vendor_reconciliation.py"
-      - "tests/test_kr_vendor_reconciliation.py"
   workflow_dispatch:
 
 concurrency:

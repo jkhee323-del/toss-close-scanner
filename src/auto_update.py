@@ -60,6 +60,7 @@ def update_korea() -> None:
     cutoff = _latest_complete_kr_date()
     end = cutoff + pd.Timedelta(days=1)
     ok = fail = unchanged = 0
+    latest_saved_sessions: list[pd.Timestamp] = []
     for i, path in enumerate(paths, 1):
         symbol = path.stem.zfill(6)
         try:
@@ -79,6 +80,7 @@ def update_korea() -> None:
             merged = merged.drop_duplicates("date", keep="last").sort_values("date").tail(1200).reset_index(drop=True)
             before = pd.Timestamp(original["date"].max()).normalize()
             after = pd.Timestamp(merged["date"].max()).normalize()
+            latest_saved_sessions.append(after)
             old_cmp = original.tail(1200).reset_index(drop=True)
             if len(old_cmp) == len(merged) and old_cmp.equals(merged):
                 unchanged += 1
@@ -94,6 +96,20 @@ def update_korea() -> None:
     print(f"KR refresh: changed={ok}, unchanged={unchanged}, failed={fail}")
     if fail > max(30, len(paths) // 3):
         raise RuntimeError("Too many KRX refresh failures")
+    # A silently empty/unauthenticated provider must not be counted as an
+    # ongoing success indefinitely. Allow one business-day lag for holidays
+    # or data settlement, and require broad universe coverage.
+    freshness_floor = cutoff - pd.offsets.BDay(1)
+    recent_count = sum(day >= freshness_floor for day in latest_saved_sessions)
+    coverage = recent_count / len(paths)
+    print(f"KR refresh freshness: latest_cutoff={cutoff.date()}, "
+          f"minimum_accepted={freshness_floor.date()}, "
+          f"recent_symbols={recent_count}/{len(paths)} ({coverage:.1%})")
+    if coverage < 0.70:
+        raise RuntimeError(
+            f"KRX provider may be unavailable: only {coverage:.1%} of symbols "
+            f"have a session at or after {freshness_floor.date()}"
+        )
 
 
 def _fetch_global(ticker: str) -> pd.DataFrame:

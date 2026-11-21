@@ -87,3 +87,40 @@ All GitHub Actions comparisons are research validation, not trading advice.
 
 No historic bars or production prediction models were overwritten as part
 of this handoff.
+
+## Additional engineering fixes completed November 21
+
+- The full 49-symbol archived source reconciliation was attempted and the
+  pykrx logs explicitly reported missing KRX login. The initial zero-filled
+  responses were **not** independent confirmation of the archived anomalies.
+- The latest read-only reconciliation now checks secrets before querying KRX,
+  reports `krx_credentials_missing`, and **fails deliberately** without a
+  trusted source. Report artifacts remain available even on failure. The
+  workflow is manual-only to avoid repeated, unlicensed vendor calls.
+- Lab regression suite after adding archive source-validation tests:
+  **78 passed**. After adding KRX freshness coverage tests: **81 passed**.
+- Both deployed market-data update workflows now run the existing
+  `src.production_smoke` validation **before** committing any refreshed
+  prices. The overseas pre-publication smoke was confirmed successful on
+  run `44888483416`.
+- A previously silent defect was found in the KRX refresh step:
+  **KRX login failed**, yet `changed=0, unchanged=499, failed=0` was
+  logged and the workflow exited successfully. Hence 'no changed files'
+  must NOT be treated as evidence of successful provider access.
+- New Korean refresh guard requires at least **70%** of archived symbols
+  to have data within **one business day** of the completed-session cutoff.
+  This protects against stale authentication failures without rejecting
+  the normal Friday close on a weekend. It is not an official KRX holiday
+  calendar, so a longer holiday can produce a conservative alert.
+- The new guard was unit-tested in `accuracy-lab` before being selectively
+  promoted to `main` with its own regression tests.
+- The provider credentials required for KRX source recovery (and investor
+  flow data) were not present in GitHub Actions. Configure them directly
+  under the repository's **Settings → Secrets and variables → Actions**,
+  using names `KRX_ID` and `KRX_PW`, and rerun the failed read-only
+  reconciliation job. Do not post them in chat, source files, or issues.
+
+**Release decision remains conservative:** production data-validation
+guardrails are being strengthened; the experimental 1/3/6/12-month AI
+models and automatic CVD/flow integration remain outside production until
+their data provenance and out-of-sample performance are established.

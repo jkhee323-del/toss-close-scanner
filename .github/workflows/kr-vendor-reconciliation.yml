@@ -1,0 +1,36 @@
+name: Archived Korean Vendor Reconciliation
+
+on:
+  push:
+    branches: [accuracy-lab]
+    paths:
+      - ".github/workflows/kr-vendor-reconciliation.yml"
+      - "src/kr_vendor_reconciliation.py"
+      - "tests/test_kr_vendor_reconciliation.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install read-only audit dependencies
+        run: python -m pip install -r requirements.txt pytest
+      - name: Test vendor comparison and archive preservation
+        run: python -m pytest tests/test_kr_vendor_reconciliation.py -q
+      - name: Query independent KRX source for archived invalid rows
+        run: python -m src.kr_vendor_reconciliation
+      - name: Upload review-only vendor comparison
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kr-vendor-review-candidates
+          path: data/experiments/kr_vendor_reconciliation.csv

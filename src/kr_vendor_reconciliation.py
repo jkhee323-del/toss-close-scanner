@@ -179,6 +179,17 @@ def main() -> None:
     print("No production or archived market prices were changed.")
     if report.empty:
         raise SystemExit("No invalid histories found or no diagnostic rows produced")
+    confirmed = report["status"].isin([
+        "vendor_valid_pending_manual_approval",
+        "price_basis_review_required",
+        "provider_missing_session",
+        "provider_also_invalid",
+    ]).sum()
+    if not confirmed:
+        raise SystemExit(
+            "BLOCKED: KRX did not return trustworthy independent price observations. "
+            "The report is diagnostic only; configure authorized provider access before repair."
+        )
 
 
 if __name__ == "__main__":

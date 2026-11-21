@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import time
 from pathlib import Path
 
@@ -115,6 +116,8 @@ def vendor_is_trustworthy(vendor: pd.DataFrame) -> bool:
 
 
 def fetch_kr_vendor(symbol: str, first_bad: pd.Timestamp, last_bad: pd.Timestamp) -> pd.DataFrame:
+    if not (os.getenv("KRX_ID") and os.getenv("KRX_PW")):
+        raise PermissionError("KRX_ID and KRX_PW secrets are required for archived KRX price checks")
     from pykrx import stock
     start = (first_bad - pd.Timedelta(days=12)).strftime("%Y%m%d")
     end = (last_bad + pd.Timedelta(days=12)).strftime("%Y%m%d")
@@ -131,6 +134,15 @@ def audit(
         if max_symbols <= 0:
             raise ValueError("max_symbols must be positive")
         paths = paths[:max_symbols]
+    # The current pykrx historical endpoint can return zero-filled prices when
+    # KRX login is unavailable. Do not contact it or mislabel these as vendor
+    # confirmation until authorized credentials have been configured.
+    if fetcher is fetch_kr_vendor and not (os.getenv("KRX_ID") and os.getenv("KRX_PW")):
+        return pd.DataFrame([
+            {"symbol": path.stem, "date": "", "status": "krx_credentials_missing",
+             "error": "Set authorized KRX_ID and KRX_PW as GitHub Actions secrets"}
+            for path in paths
+        ])
     results = []
     for i, path in enumerate(paths, 1):
         symbol = path.stem

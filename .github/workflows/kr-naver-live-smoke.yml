@@ -1,0 +1,25 @@
+name: NAVER Fresh Korean Price Probe
+
+on:
+  push:
+    branches: [accuracy-lab]
+    paths:
+      - ".github/workflows/kr-naver-live-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: python -m pip install -r requirements.txt
+      - name: Check NAVER recent unadjusted OHLCV against cache
+        run: python -m src.kr_naver_live_smoke

@@ -4,6 +4,12 @@ import pytest
 from src import auto_update as updater
 
 
+@pytest.fixture(autouse=True)
+def avoid_external_naver_request(monkeypatch):
+    # Tests are never allowed to fetch a live market provider by accident.
+    monkeypatch.setattr(updater, "fetch_naver_ohlcv", lambda *args: pd.DataFrame())
+
+
 def test_kr_cutoff_before_close():
     assert updater._latest_complete_kr_date(pd.Timestamp("2026-11-16 09:30", tz="Asia/Seoul")) == pd.Timestamp("2026-11-15")
 
@@ -79,3 +85,53 @@ def test_krx_refresh_requires_broad_recent_coverage(tmp_path, monkeypatch):
     monkeypatch.setattr(updater.time, "sleep", lambda _: None)
     with pytest.raises(RuntimeError, match="only 33.3%"):
         updater.update_korea()
+
+
+def test_no_krx_login_naver_can_append_verified_next_session(tmp_path, monkeypatch):
+    folder = tmp_path / "history"
+    folder.mkdir()
+    days = pd.bdate_range("2026-11-09", periods=9)
+    original = pd.DataFrame({
+        "date": days[:-1], "open": [100.0] * 8,
+        "high": [103.0] * 8, "low": [99.0] * 8,
+        "close": [102.0] * 8, "volume": [1000] * 8,
+    })
+    original.to_csv(folder / "005930.csv", index=False)
+    expected = original.copy()
+    expected.loc[len(expected)] = [days[-1], 101.0, 105.0, 100.0, 104.0, 1500]
+    monkeypatch.setattr(updater, "KR_HISTORY", folder)
+    monkeypatch.setattr(updater, "_latest_complete_kr_date", lambda: pd.Timestamp(days[-1]))
+    monkeypatch.setattr(updater.stock, "get_market_ohlcv_by_date", lambda *args: pd.DataFrame())
+    monkeypatch.setattr(updater, "fetch_naver_ohlcv", lambda *args: expected.copy())
+    monkeypatch.setattr(updater.time, "sleep", lambda *_: None)
+    updater.update_korea()
+    actual = pd.read_csv(folder / "005930.csv")
+    assert len(actual) == 9
+    assert actual["close"].iloc[-1] == 104
+    assert actual["close"].iloc[0] == 102
+
+
+def test_naver_bad_adjustment_basis_never_overwrites_existing_prices(tmp_path, monkeypatch):
+    folder = tmp_path / "history"
+    folder.mkdir()
+    days = pd.bdate_range("2026-11-09", periods=9)
+    original = pd.DataFrame({
+        "date": days[:-1], "open": [100.0] * 8,
+        "high": [103.0] * 8, "low": [99.0] * 8,
+        "close": [102.0] * 8, "volume": [1000] * 8,
+    })
+    file = folder / "005930.csv"
+    original.to_csv(file, index=False)
+    before = file.read_bytes()
+    wrong = original.copy()
+    wrong[["open", "high", "low", "close"]] *= 2
+    wrong.loc[len(wrong)] = [days[-1], 201.0, 205.0, 200.0, 204.0, 2000]
+    monkeypatch.setattr(updater, "KR_HISTORY", folder)
+    monkeypatch.setattr(updater, "_latest_complete_kr_date", lambda: pd.Timestamp(days[-1]))
+    monkeypatch.setattr(updater.stock, "get_market_ohlcv_by_date", lambda *args: pd.DataFrame())
+    monkeypatch.setattr(updater, "fetch_naver_ohlcv", lambda *args: wrong.copy())
+    monkeypatch.setattr(updater.time, "sleep", lambda *_: None)
+    # Stored last session is still within the allowed business-day buffer.
+    # An unverified provider must not silently alter any historical prices.
+    updater.update_korea()
+    assert file.read_bytes() == before

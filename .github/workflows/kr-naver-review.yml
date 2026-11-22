@@ -5,6 +5,9 @@ on:
     branches: [accuracy-lab]
     paths:
       - ".github/workflows/kr-naver-review.yml"
+      - "src/kr_naver_provider.py"
+      - "src/kr_vendor_reconciliation.py"
+      - "tests/test_kr_naver_provider.py"
   workflow_dispatch:
 
 permissions:

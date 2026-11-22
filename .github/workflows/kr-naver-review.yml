@@ -1,0 +1,32 @@
+name: NAVER Korean History Cross-Check
+
+on:
+  push:
+    branches: [accuracy-lab]
+    paths:
+      - ".github/workflows/kr-naver-review.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: python -m pip install -r requirements.txt pytest
+      - name: Verify independent quote feed safety
+        run: python -m pytest tests/test_kr_naver_provider.py tests/test_kr_vendor_reconciliation.py -q
+      - name: Compare eight historic symbols against NAVER prices
+        run: python -m src.kr_vendor_reconciliation --provider naver --max-symbols 8 --output data/experiments/kr_naver_crosscheck.csv
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: naver-independent-price-crosscheck
+          path: data/experiments/kr_naver_crosscheck.csv

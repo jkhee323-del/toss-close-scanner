@@ -71,6 +71,8 @@ def update_korea() -> None:
             if old.empty:
                 raise ValueError("No completed KRX sessions in stored history")
             last = pd.Timestamp(old["date"].max())
+            # Freshness counts the cache even if an upstream provider fails.
+            latest_saved_sessions.append(last.normalize())
             # Verify the provider against actual saved closing sessions BEFORE
             # accepting any update. Append new sessions only; do not overwrite
             # stored historical adjustments using unaudited vendor revisions.
@@ -101,7 +103,7 @@ def update_korea() -> None:
             merged = merged.drop_duplicates("date", keep="last").sort_values("date").tail(1200).reset_index(drop=True)
             before = pd.Timestamp(original["date"].max()).normalize()
             after = pd.Timestamp(merged["date"].max()).normalize()
-            latest_saved_sessions.append(after)
+            latest_saved_sessions[-1] = after
             old_cmp = original.tail(1200).reset_index(drop=True)
             if len(old_cmp) == len(merged) and old_cmp.equals(merged):
                 unchanged += 1

@@ -65,6 +65,8 @@ def update_korea() -> None:
     latest_saved_sessions: list[pd.Timestamp] = []
     for i, path in enumerate(paths, 1):
         symbol = path.stem.zfill(6)
+        original = None
+        old = None
         try:
             original = pd.read_csv(path, parse_dates=["date"]).sort_values("date")
             old = original.loc[original["date"].dt.normalize() <= cutoff].copy()
@@ -114,7 +116,7 @@ def update_korea() -> None:
         except Exception as exc:  # noqa: BLE001
             # Provider failure must not preserve a previously cached intraday
             # candle dated beyond the last completed KRX session.
-            if "old" in locals() and "original" in locals():
+            if old is not None and original is not None:
                 if len(old) < len(original) and not old.empty:
                     old.tail(1200).to_csv(path, index=False, encoding="utf-8-sig")
                     print(f"[CLEAN] {symbol}: removed unfinished future session without new provider data")

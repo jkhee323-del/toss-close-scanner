@@ -17,6 +17,7 @@ import pandas as pd
 
 from .auto_update import _normalize_kr
 from .data_quality_triage import NEEDED, diagnose_file
+from .kr_naver_provider import fetch_naver_review_window
 
 FIELDS = ["open", "high", "low", "close", "volume"]
 
@@ -182,12 +183,14 @@ def main() -> None:
     parser.add_argument("--directory", type=Path, default=Path("data/history"))
     parser.add_argument("--output", type=Path, default=Path("data/experiments/kr_vendor_reconciliation.csv"))
     parser.add_argument("--max-symbols", type=int, default=None)
+    parser.add_argument("--provider", choices=["krx", "naver"], default="krx")
     args = parser.parse_args()
-    report = audit(args.directory, max_symbols=args.max_symbols)
+    selected_fetcher = fetch_naver_review_window if args.provider == "naver" else fetch_kr_vendor
+    report = audit(args.directory, max_symbols=args.max_symbols, fetcher=selected_fetcher)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     report.to_csv(args.output, index=False)
     status = report["status"].value_counts().to_dict() if not report.empty else {}
-    print(f"Vendor reconciliation: {len(report)} rows, statuses={json.dumps(status, ensure_ascii=False)}")
+    print(f"Vendor reconciliation provider={args.provider}: {len(report)} rows, statuses={json.dumps(status, ensure_ascii=False)}")
     print("No production or archived market prices were changed.")
     if report.empty:
         raise SystemExit("No invalid histories found or no diagnostic rows produced")

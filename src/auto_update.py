@@ -112,6 +112,12 @@ def update_korea() -> None:
                 ok += 1
                 print(f"[{i}/{len(paths)}] {symbol}: {before.date()} -> {after.date()} ({source})")
         except Exception as exc:  # noqa: BLE001
+            # Provider failure must not preserve a previously cached intraday
+            # candle dated beyond the last completed KRX session.
+            if "old" in locals() and "original" in locals():
+                if len(old) < len(original) and not old.empty:
+                    old.tail(1200).to_csv(path, index=False, encoding="utf-8-sig")
+                    print(f"[CLEAN] {symbol}: removed unfinished future session without new provider data")
             fail += 1
             print(f"[WARN] {symbol}: {exc}")
         time.sleep(0.06)

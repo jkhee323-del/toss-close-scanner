@@ -23,7 +23,7 @@ def test_valid_independent_naver_overlap():
 def test_stale_adjusted_share_price_rejected():
     base = _cached()
     alt = base.copy()
-    alt["close"] *= 2
+    alt[["open", "high", "low", "close"]] *= 2
     with pytest.raises(ValueError, match="adjustment bases disagree"):
         validate_naver_overlap(base, alt)
 

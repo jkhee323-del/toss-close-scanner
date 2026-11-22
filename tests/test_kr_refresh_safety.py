@@ -131,8 +131,7 @@ def test_naver_bad_adjustment_basis_never_overwrites_existing_prices(tmp_path, m
     monkeypatch.setattr(updater.stock, "get_market_ohlcv_by_date", lambda *args: pd.DataFrame())
     monkeypatch.setattr(updater, "fetch_naver_ohlcv", lambda *args: wrong.copy())
     monkeypatch.setattr(updater.time, "sleep", lambda *_: None)
-    # Stored last session is one day behind. The post-refresh fallback must
-    # reject the mismatched vendor rather than rewriting the cached rows.
-    with pytest.raises(RuntimeError, match="KRX provider may be unavailable"):
-        updater.update_korea()
+    # Stored last session is still within the allowed business-day buffer.
+    # An unverified provider must not silently alter any historical prices.
+    updater.update_korea()
     assert file.read_bytes() == before

@@ -17,6 +17,8 @@ from pykrx import stock
 
 from .indicators import add_indicators
 from .search import GLOBAL_SCAN_UNIVERSE
+from .kr_naver_provider import fetch_naver_ohlcv
+from .kr_recent_refresh_guard import verified_new_candles
 
 DATA = Path("data")
 KR_HISTORY = DATA / "history"
@@ -63,32 +65,61 @@ def update_korea() -> None:
     latest_saved_sessions: list[pd.Timestamp] = []
     for i, path in enumerate(paths, 1):
         symbol = path.stem.zfill(6)
+        original = None
+        old = None
         try:
             original = pd.read_csv(path, parse_dates=["date"]).sort_values("date")
             old = original.loc[original["date"].dt.normalize() <= cutoff].copy()
             if old.empty:
                 raise ValueError("No completed KRX sessions in stored history")
             last = pd.Timestamp(old["date"].max())
-            # Re-fetch overlapping completed sessions to account for revisions.
-            start = (last - pd.Timedelta(days=10)).strftime("%Y%m%d")
-            raw = stock.get_market_ohlcv_by_date(start, end.strftime("%Y%m%d"), symbol)
-            fresh = _normalize_kr(raw)
-            if not fresh.empty:
-                fresh = fresh.loc[fresh["date"].dt.normalize() <= cutoff].copy()
-            merged = pd.concat([old, fresh], ignore_index=True) if not fresh.empty else old
+            # Freshness counts the cache even if an upstream provider fails.
+            latest_saved_sessions.append(last.normalize())
+            # Verify the provider against actual saved closing sessions BEFORE
+            # accepting any update. Append new sessions only; do not overwrite
+            # stored historical adjustments using unaudited vendor revisions.
+            start_day = last - pd.Timedelta(days=21)
+            source = "KRX"
+            try:
+                raw = stock.get_market_ohlcv_by_date(
+                    start_day.strftime("%Y%m%d"), end.strftime("%Y%m%d"), symbol
+                )
+                candidate = _normalize_kr(raw)
+                additions = verified_new_candles(old, candidate, cutoff)
+            except Exception as krx_error:
+                # Authorized-independent NAVER source when KRX login is absent.
+                # No data is accepted without price-basis overlap verification.
+                source = "NAVER"
+                try:
+                    candidate = fetch_naver_ohlcv(
+                        symbol, start_day.date().isoformat(), end.date().isoformat()
+                    )
+                    additions = verified_new_candles(old, candidate, cutoff)
+                except Exception as alt_error:
+                    raise RuntimeError(
+                        f"KRX unavailable ({type(krx_error).__name__}); "
+                        f"NAVER unverified ({type(alt_error).__name__}: {alt_error})"
+                    ) from alt_error
+            merged = pd.concat([old, additions], ignore_index=True) if not additions.empty else old
             merged["date"] = pd.to_datetime(merged["date"]).dt.tz_localize(None)
             merged = merged.drop_duplicates("date", keep="last").sort_values("date").tail(1200).reset_index(drop=True)
             before = pd.Timestamp(original["date"].max()).normalize()
             after = pd.Timestamp(merged["date"].max()).normalize()
-            latest_saved_sessions.append(after)
+            latest_saved_sessions[-1] = after
             old_cmp = original.tail(1200).reset_index(drop=True)
             if len(old_cmp) == len(merged) and old_cmp.equals(merged):
                 unchanged += 1
             else:
                 merged.to_csv(path, index=False, encoding="utf-8-sig")
                 ok += 1
-                print(f"[{i}/{len(paths)}] {symbol}: {before.date()} -> {after.date()}")
+                print(f"[{i}/{len(paths)}] {symbol}: {before.date()} -> {after.date()} ({source})")
         except Exception as exc:  # noqa: BLE001
+            # Provider failure must not preserve a previously cached intraday
+            # candle dated beyond the last completed KRX session.
+            if old is not None and original is not None:
+                if len(old) < len(original) and not old.empty:
+                    old.tail(1200).to_csv(path, index=False, encoding="utf-8-sig")
+                    print(f"[CLEAN] {symbol}: removed unfinished future session without new provider data")
             fail += 1
             print(f"[WARN] {symbol}: {exc}")
         time.sleep(0.06)
@@ -96,8 +127,9 @@ def update_korea() -> None:
     print(f"KR refresh: changed={ok}, unchanged={unchanged}, failed={fail}")
     if fail > max(30, len(paths) // 3):
         raise RuntimeError("Too many KRX refresh failures")
-    # Refuse silently stale feeds even when pykrx returns empty without errors.
-    # Allow one business-day lag for holidays and settlement variability.
+    # A silently empty/unauthenticated provider must not be counted as an
+    # ongoing success indefinitely. Allow one business-day lag for holidays
+    # or data settlement, and require broad universe coverage.
     freshness_floor = cutoff - pd.offsets.BDay(1)
     recent_count = sum(day >= freshness_floor for day in latest_saved_sessions)
     coverage = recent_count / len(paths)

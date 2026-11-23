@@ -703,6 +703,8 @@ c_logo.markdown(f'<span class="logo">📈 종가매매 AI 스캐너</span><span 
 c_mkt.markdown(seg([("🇰🇷 한국", make_link(m="kr", d=0, sym="", q="", rep=""), market == "kr"),
                     ("🌎 해외", make_link(m="us", d=0, sym="", q="", rep=""), market == "us")], css="mkt"), unsafe_allow_html=True)
 
+st.page_link("pages/1_중장기 투자.py", label="📊 중·장기 투자 스캐너 보기")
+
 if q:
     if cands:
         chips = "".join(

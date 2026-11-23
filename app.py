@@ -12,6 +12,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from src.indicators import add_indicators
+from src.cvd import compute_cvd
 from src.global_cache_validation import validate_global_candidates
 from src.model import FEATURES
 from src.search import GLOBAL_SCAN_UNIVERSE, US_NAME_MAP, load_kr_listing, search_all, search_yahoo
@@ -754,6 +755,34 @@ with st.container(border=True):
             report_us(sel)
     else:
         st.markdown('<div class="rep-empty">목록에서 <b>리포트</b> 버튼을 누르면 이 자리에 표시됩니다.</div>', unsafe_allow_html=True)
+
+# ── 실험실: 실제 체결 방향이 있는 CSV만 CVD 계산 ──────────────────────────────
+with st.expander("🧪 실제 체결 데이터 CVD (CSV 업로드 · 실험 기능)"):
+    st.caption(
+        "필수 열: timestamp(타임존 포함), volume, aggressor_side(buy/sell). "
+        "실제 매수·매도 주도 방향이 없는 일봉·OBV로는 CVD를 계산하지 않습니다. "
+        "파일은 이 화면에서만 분석하고 서버 저장 파일로 기록하지 않습니다."
+    )
+    cvd_file = st.file_uploader("체결 내역 CSV 파일", type=["csv"], key="cvd_trade_file")
+    cvd_reset = st.checkbox("거래일별 CVD 초기화", value=True, key="cvd_reset_daily")
+    if cvd_file is not None:
+        if cvd_file.size > 5 * 1024 * 1024:
+            st.error("체결 파일은 5MB 이하만 지원합니다.")
+        else:
+            try:
+                trade_df = pd.read_csv(cvd_file, usecols=["timestamp", "volume", "aggressor_side"])
+                if len(trade_df) > 100_000:
+                    raise ValueError("100,000건 이하 체결 기록만 지원합니다.")
+                delta_df = compute_cvd(trade_df, reset_each_session=cvd_reset)
+                if delta_df.empty:
+                    st.info("체결 데이터가 없습니다.")
+                else:
+                    st.metric("마지막 CVD(수량 기준)", f"{delta_df['cvd'].iloc[-1]:,.0f}")
+                    cvd_chart = delta_df.groupby("timestamp", as_index=False)["cvd"].last()
+                    st.line_chart(cvd_chart.set_index("timestamp")["cvd"])
+                    st.caption("매수 주도 수량 − 매도 주도 수량의 누적값입니다. 가격 상승 확률이 아닙니다.")
+            except (ValueError, KeyError, TypeError, pd.errors.ParserError) as exc:
+                st.error(f"체결 데이터 형식을 확인해주세요: {exc}")
 
 # ── URL 동기화 (새로고침해도 같은 화면) ─────────────────────────────────────
 params = {"m": market, "d": str(day), "n": str(top_n), "tv": str(min_value_100m)}

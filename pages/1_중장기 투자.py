@@ -6,6 +6,7 @@ import streamlit as st
 
 from src.long_term_scanner import HORIZONS, get_recommendations
 from src.investor_flow import fetch_investor_flows
+from src.investor_flow_import import summarize_imported_flows
 from src.search import load_kr_listing, US_NAME_MAP
 
 
@@ -256,7 +257,42 @@ else:
 
     if market_code == "KR":
         with st.expander("외국인·기관 순매수 (최근 20거래일, 실제 거래대금)"):
-            st.caption("한국거래소 투자자별 확정 데이터 사용 · 데이터는 오후 6시 이후 반영 · 점수에는 아직 미반영")
+            st.caption(
+                "수급 데이터는 기술적 추천 점수에 미반영됩니다. "
+                "인증된 KRX 조회와 직접 가져온 CSV는 별개입니다."
+            )
+            st.markdown("**CSV 파일로 직접 확인 (KRX 로그인 없이 사용 가능)**")
+            st.caption(
+                "필수 열: date, symbol, foreign_net_krw, institution_net_krw. "
+                "금액 단위는 원(KRW), 종목코드는 6자리입니다. "
+                "CSV 제공처와 정확성은 사용자가 확인해야 하며 자동 수급 데이터가 아닙니다."
+            )
+            imported_file = st.file_uploader(
+                "수급 데이터 CSV 선택", type=["csv"], key="imported_kr_investor_flows"
+            )
+            if imported_file is not None:
+                if imported_file.size > 3 * 1024 * 1024:
+                    st.error("수급 CSV 파일 크기는 3MB 이하로 제한합니다.")
+                else:
+                    try:
+                        uploaded = pd.read_csv(imported_file, dtype={"symbol": str})
+                        imported_summary = summarize_imported_flows(
+                            uploaded, result["종목코드"].head(10).tolist(),
+                            result["기준일"].iloc[0], lookback=20,
+                        )
+                        by_code = dict(zip(result["종목코드"], result["기업명"]))
+                        imported_summary.insert(
+                            0, "기업명",
+                            imported_summary["종목코드"].map(by_code).fillna("이름 미확인"),
+                        )
+                        st.dataframe(imported_summary, hide_index=True, width="stretch")
+                        st.caption(
+                            "CSV 내부의 미래 날짜는 기준일 이후라면 계산에서 제외됩니다. "
+                            "자료 없음은 0원 순매수로 취급하지 않습니다."
+                        )
+                    except (ValueError, KeyError, TypeError, pd.errors.ParserError) as exc:
+                        st.error(f"수급 CSV를 확인해주세요: {exc}")
+
             if not (os.getenv("KRX_ID") and os.getenv("KRX_PW")):
                 st.warning("KRX 수급 조회에 필요한 인증 설정이 없습니다. 배포 환경의 비밀 설정에 KRX_ID·KRX_PW를 등록한 뒤 이용할 수 있습니다.")
             else:

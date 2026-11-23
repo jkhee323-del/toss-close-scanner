@@ -1,0 +1,29 @@
+name: Korean Session Freshness Probe
+
+on:
+  push:
+    branches: [accuracy-lab]
+    paths:
+      - ".github/workflows/kr-refresh-watchdog-probe.yml"
+      - "src/kr_refresh_watchdog.py"
+      - "tests/test_kr_refresh_watchdog.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: python -m pip install -r requirements.txt pytest
+      - name: Test session freshness comparisons
+        run: python -m pytest tests/test_kr_refresh_watchdog.py -q
+      - name: Verify live provider date without changing repo files
+        run: python -m src.kr_refresh_watchdog

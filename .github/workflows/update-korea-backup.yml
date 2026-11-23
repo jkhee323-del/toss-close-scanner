@@ -1,0 +1,64 @@
+name: Korea Market Data Backup Refresh
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/update-korea-backup.yml"
+  schedule:
+    # 20:45 KST Monday-Friday: catch missed or delayed 16:35 primary runs.
+    # Backup exits without fetching all tickers if cache matches confirmed session.
+    - cron: "45 11 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: market-data-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install production dependencies and tests
+        run: python -m pip install -r requirements.txt pytest
+      - name: Test the independent freshness watchdog
+        run: python -m pytest tests/test_kr_refresh_watchdog.py -q
+      - name: Repair missing confirmed sessions when needed
+        run: python -m src.kr_refresh_watchdog --refresh-if-needed
+      - name: Validate both scanners before committing
+        run: python -m src.production_smoke
+      - name: Commit repaired Korean daily prices
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f data/history
+          if git diff --cached --quiet; then
+            echo "Verified market cache is current; no new prices to publish."
+          else
+            git commit -m "Backup refresh of verified Korean daily prices"
+            git pull --rebase --autostash origin main
+            git push origin HEAD:main
+          fi
+      - name: Sync restored prices into laboratory
+        run: |
+          updated_main=$(git rev-parse HEAD)
+          git fetch origin accuracy-lab
+          git switch -C accuracy-lab origin/accuracy-lab
+          git restore --source="$updated_main" --staged --worktree -- data/history
+          if ! git diff --cached --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "Sync verified Korean daily prices into lab"
+            git push origin HEAD:accuracy-lab
+          fi

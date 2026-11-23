@@ -7,6 +7,7 @@ import pandas as pd
 from .signals import compute_scored_window, pick_signals
 from .global_cache_validation import validate_global_candidates
 from .data_integrity_audit import inspect_market
+from .long_term_scanner import HORIZONS, get_recommendations
 
 
 def run(data_dir: str | Path = "data") -> dict:
@@ -31,7 +32,19 @@ def run(data_dir: str | Path = "data") -> dict:
             f"Overseas market cache failed audit: {overseas_health.get('total_errors')} errors"
         )
     overseas_candidates = validate_global_candidates(data)
+    # Validate only technical ranking, not experimental future-rise ML models.
+    period_counts = {"KR": {}, "US": {}}
+    for market in ("KR", "US"):
+        for period in HORIZONS:
+            ranked = get_recommendations(period, market=market)
+            if ranked.empty or not {"기준일", "점수", "종목코드"}.issubset(ranked.columns):
+                raise RuntimeError(f"Long-term {market} horizon {period} has no usable recommendations")
+            scores = pd.to_numeric(ranked["점수"], errors="coerce")
+            if scores.isna().any() or not scores.between(0, 100).all():
+                raise RuntimeError(f"Long-term {market} horizon {period} has invalid technical scores")
+            period_counts[market][period] = len(ranked)
     result = {
+        "long_term_period_counts": period_counts,
         "foreign_symbols_verified": overseas_health["valid"],
         "foreign_candidates_verified": overseas_candidates["candidate_rows_verified"],
         "as_of": str(pd.Timestamp(meta["latest_date"]).date()),

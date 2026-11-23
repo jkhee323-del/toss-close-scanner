@@ -6,6 +6,15 @@ on:
     paths:
       - ".github/workflows/production-smoke.yml"
       - "app.py"
+      - "pages/**"
+      - "src/long_term_scanner.py"
+      - "src/investor_flow.py"
+      - "src/investor_flow_import.py"
+      - "data/us_universe.csv"
+      - "data/us_names_ko.csv"
+      - "tests/test_long_term_recommendations.py"
+      - "tests/test_investor_flow.py"
+      - "tests/test_investor_flow_import.py"
       - "src/signals.py"
       - "src/data_integrity_audit.py"
       - "data/global_history/**"
@@ -37,8 +46,8 @@ jobs:
           cache: pip
       - run: python -m pip install -r requirements.txt pytest
       - name: Check Streamlit and model Python syntax
-        run: python -m compileall -q app.py src tests
+        run: python -m compileall -q app.py pages src tests
       - name: Test global market provider validation and dates
-        run: python -m pytest tests/test_global_refresh_safety.py tests/test_global_cache_validation.py tests/test_kr_refresh_safety.py tests/test_kr_naver_provider.py -q
+        run: python -m pytest tests/test_global_refresh_safety.py tests/test_global_cache_validation.py tests/test_kr_refresh_safety.py tests/test_kr_naver_provider.py tests/test_long_term_recommendations.py tests/test_investor_flow.py tests/test_investor_flow_import.py -q
       - name: Execute deployed KR model and all four date tabs
         run: python -m src.production_smoke

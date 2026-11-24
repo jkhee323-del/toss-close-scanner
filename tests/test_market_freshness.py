@@ -71,7 +71,7 @@ def test_local_global_cache_reports_nvda_stale_without_modifying_files(tmp_path)
     }
     for sym, date in data.items():
         path = tmp_path / f"{sym}.csv"
-        path.write_text("date,close\\n" + date + ",100\\n", encoding="utf-8")
+        path.write_text("date,close\n" + date + ",100\n", encoding="utf-8")
     universe = [("MSFT", "Microsoft", "미국"), ("NVDA", "NVIDIA", "미국")]
     originals = {sym: (tmp_path / f"{sym}.csv").read_bytes() for sym in data}
     stale = find_stale_cached_symbols(tmp_path, universe, now=now)

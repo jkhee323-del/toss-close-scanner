@@ -32,6 +32,9 @@ on:
       - "tests/test_kr_refresh_safety.py"
       - "tests/test_global_cache_validation.py"
       - "src/global_cache_validation.py"
+      - "src/market_freshness.py"
+      - "tests/test_market_freshness.py"
+      - "tests/test_public_release_safety.py"
   workflow_dispatch:
 
 permissions:
@@ -51,6 +54,6 @@ jobs:
       - name: Check Streamlit and model Python syntax
         run: python -m compileall -q app.py pages src tests
       - name: Test global market provider validation and dates
-        run: python -m pytest tests/test_global_refresh_safety.py tests/test_global_cache_validation.py tests/test_kr_refresh_safety.py tests/test_kr_naver_provider.py tests/test_long_term_recommendations.py tests/test_long_term_compatibility.py tests/test_cvd.py tests/test_investor_flow.py tests/test_investor_flow_import.py -q
+        run: python -m pytest tests/test_global_refresh_safety.py tests/test_global_cache_validation.py tests/test_kr_refresh_safety.py tests/test_kr_naver_provider.py tests/test_long_term_recommendations.py tests/test_long_term_compatibility.py tests/test_cvd.py tests/test_investor_flow.py tests/test_investor_flow_import.py tests/test_market_freshness.py tests/test_public_release_safety.py -q
       - name: Execute deployed KR model and all four date tabs
         run: python -m src.production_smoke

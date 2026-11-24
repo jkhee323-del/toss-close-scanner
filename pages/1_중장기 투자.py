@@ -5,6 +5,7 @@ import pandas as pd
 import streamlit as st
 
 from src.long_term_scanner import HORIZONS, get_recommendations
+from src.market_freshness import session_notice
 from src.investor_flow import fetch_investor_flows
 from src.investor_flow_import import summarize_imported_flows
 from src.search import load_kr_listing, US_NAME_MAP
@@ -32,7 +33,7 @@ with nav_long:
     )
 
 st.title("📊 중·장기 투자 스캐너")
-st.caption("한국 코스피·코스닥 | 대형주·중소형주 기술적 분석")
+st.caption("한국·미국 저장 일봉 기반 기술적 분석 · 실시간 시세가 아닙니다.")
 
 market = st.radio("투자 시장 선택", ["🇰🇷 한국", "🇺🇸 미국"], horizontal=True)
 market_code = "US" if market == "🇺🇸 미국" else "KR"
@@ -52,7 +53,7 @@ top_n = st.slider(
     value=10,
     step=1,
 )
-st.caption("기술적 점수는 상승 확률이 아니며, 분석 기준일을 반드시 확인하세요.")
+st.caption("가격은 분석 기준일의 저장 종가이며 실시간 현재가가 아닙니다. 기술적 점수는 상승 확률이 아닙니다.")
 
 run_analysis = st.button("🔍 선택한 조건으로 분석 실행", type="primary")
 if run_analysis:
@@ -186,7 +187,7 @@ else:
         st.metric("선택한 투자 기간", name)
 
     with c:
-        st.metric("추천 종목", f"{len(result)}개")
+        st.metric("분석 가능 종목", f"{len(result)}개")
 
 
 
@@ -196,12 +197,14 @@ else:
 
 
     latest_session = pd.to_datetime(result["기준일"].iloc[0], errors="coerce")
-    today_local = pd.Timestamp.now(tz="Asia/Seoul").tz_localize(None).normalize()
-    if pd.isna(latest_session) or latest_session + pd.offsets.BDay(5) < today_local:
+    freshness = session_notice(latest_session, market_code)
+    if freshness["warning"]:
         st.warning(
-            "저장된 시세가 최근 거래일보다 오래되었을 수 있습니다. "
-            "자동갱신 상태를 확인하기 전에는 추천 결과를 실시간 신호로 해석하지 마세요."
+            f"시장별 마지막 저장 거래일은 {freshness['date']}입니다. "
+            "최근 장 마감 데이터가 아직 반영되지 않았을 수 있습니다. "
+            "현지 휴장일과 자동갱신 상태를 확인하세요."
         )
+    st.caption(f"기술적 점수와 가격의 기준일: {freshness['date']} · 실시간 가격 아님")
 
     result = result.head(top_n).copy()
 
@@ -234,7 +237,7 @@ else:
             "종목코드": st.column_config.TextColumn("종목코드"),
             "현재가": st.column_config.NumberColumn(
 
-"현재가", format="$%,.2f" if market_code == "US" else "%,.0f원"
+"기준일 종가", format="$%,.2f" if market_code == "US" else "%,.0f원"
 
             ),
             "점수": st.column_config.ProgressColumn(

@@ -14,6 +14,7 @@ on:
       - "src/investor_flow.py"
       - "src/investor_flow_import.py"
       - "src/signals.py"
+      - "src/market_freshness.py"
   workflow_dispatch:
 
 permissions:

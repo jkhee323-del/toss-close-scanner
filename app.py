@@ -12,6 +12,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from src.indicators import add_indicators
+from src.market_freshness import find_stale_cached_symbols, session_notice, venue_for_country
 from src.cvd import compute_cvd
 from src.global_cache_validation import validate_global_candidates
 from src.model import FEATURES
@@ -310,36 +311,6 @@ def _us_snapshot(symbol: str, name: str, country: str, df: pd.DataFrame, day_off
     }
 
 
-@st.cache_data(show_spinner=False, ttl=1800)
-def scan_global_candidates(top_n: int = 14):
-    """해외 유니버스를 한 번만 내려받아 오늘~3일전 후보를 함께 만듭니다."""
-    from concurrent.futures import ThreadPoolExecutor, as_completed
-    rows = []
-    def one(item):
-        ticker, name, country = item
-        df = load_us_chart(ticker, 180)
-        got = []
-        for off in range(4):
-            snap = _us_snapshot(ticker, name, country, df, off)
-            got.append({k: snap[k] for k in ["symbol", "name", "country", "date", "latest_date", "day_offset",
-                "entry_price", "last_close", "change_pct", "trading_value", "volume_ratio", "rsi14", "ret_5d",
-                "near_20d_high", "candidate_score", "target_1", "target_2", "ret_since", "hit_1", "hit_2", "max_high_after"]})
-        return got
-    # 여러 종목을 동시에 받되 워커 수를 제한해 Yahoo 과부하/차단 위험을 낮춥니다.
-    with ThreadPoolExecutor(max_workers=6) as ex:
-        futures = [ex.submit(one, item) for item in GLOBAL_SCAN_UNIVERSE]
-        for fut in as_completed(futures):
-            try:
-                rows.extend(fut.result())
-            except Exception:
-                continue
-    if not rows:
-        return pd.DataFrame()
-    z = pd.DataFrame(rows)
-    return (z.sort_values(["day_offset", "candidate_score", "trading_value"], ascending=[True, False, False])
-             .groupby("day_offset", group_keys=False).head(top_n).reset_index(drop=True))
-
-
 def analyze_global_stock(symbol: str):
     symbol = symbol.strip().upper()
     df = load_us_chart(symbol, 180)
@@ -351,8 +322,8 @@ def sel_from_us_row(r) -> dict:
     d = pd.Timestamp(r["date"])
     close = float(r["entry_price"])
     return {
-        "market": "us", "symbol": str(r["symbol"]), "name": str(r["name"]), "country": str(r["country"]), "date": d, "latest_date": d,
-        "entry_price": close, "last_close": close, "change_pct": float(r["change_pct"]), "trading_value": float(r["trading_value"]),
+        "market": "us", "symbol": str(r["symbol"]), "name": str(r["name"]), "country": str(r["country"]), "date": d, "latest_date": pd.Timestamp(r.get("latest_date", d)),
+        "entry_price": close, "last_close": float(r.get("last_close", close)), "change_pct": float(r["change_pct"]), "trading_value": float(r["trading_value"]),
         "volume_ratio": float(r["volume_ratio"]), "rsi14": float(r["rsi14"]), "ret_5d": float(r["ret_5d"]),
         "near_20d_high": float(r["near_20d_high"]), "candidate_score": float(r["candidate_score"]),
         "target_1": float(r["target_1"]), "target_2": float(r["target_2"]),
@@ -365,10 +336,10 @@ def sel_from_us_row(r) -> dict:
 GLOBAL_CACHE = Path("data/global_candidates.csv")
 
 
-def save_global_candidates(df):
-    if df is not None and not df.empty:
-        GLOBAL_CACHE.parent.mkdir(parents=True, exist_ok=True)
-        df.to_csv(GLOBAL_CACHE, index=False, encoding="utf-8-sig")
+@st.cache_data(show_spinner=False, ttl=15 * 60)
+def cached_global_freshness_warnings():
+    # Read-only scan of files maintained by the scheduled workflow.
+    return find_stale_cached_symbols("data/global_history", GLOBAL_SCAN_UNIVERSE)
 
 
 def load_saved_global_candidates():
@@ -406,7 +377,7 @@ def signals_table(rows: list[dict], mk: str, past: bool, selected: str) -> str:
         return '<div class="empty">조건을 만족하는 종목이 없습니다.</div>'
     code_h = "코드" if mk == "kr" else "티커"
     head = f'<th>{code_h}</th><th>종목명</th>'
-    head += '<th class="num">진입가</th><th class="num">현재가</th><th class="num">수익률</th>' if past else '<th class="num">현재가</th>'
+    head += '<th class="num">진입가</th><th class="num">마지막 저장 종가</th><th class="num">수익률</th>' if past else '<th class="num">마지막 저장 종가</th>'
     head += '<th class="num">1차익절</th><th class="num">2차익절</th><th></th>'
     body = []
     for r in rows:
@@ -472,7 +443,7 @@ def report_kr(sel: dict, meta: dict, cand_count: int):
     with a:
         st.markdown('<div class="card"><div class="ctitle">📋 종목 기본 정보</div>' +
                     kv("종목명", f'{escape(sel["name"])} ({escape(sel["symbol"])})') +
-                    kv("현재가", f'<b>{won(sel["last_close"])}</b>') +
+                    kv("마지막 저장 종가", f'<b>{won(sel["last_close"])}</b>') +
                     kv("신호일 등락", f'<span class="{sign_cls(sel["change_pct"])}">{sel["change_pct"]:+.2f}%</span>') +
                     kv("거래대금", f'{sel["trading_value"] / 1e8:,.0f}억원') +
                     kv("거래량 / 20일 평균", f'{sel["volume_ratio"]:.2f}배') +
@@ -492,7 +463,7 @@ def report_kr(sel: dict, meta: dict, cand_count: int):
         if sel["past"]:
             mh = sel["max_high_after"]
             st.markdown('<div class="card"><div class="ctitle">📈 신호 이후 결과</div>' +
-                        kv("신호일(진입)", f'{sel["date"]:%Y-%m-%d}') + kv("진입가", won(entry)) + kv("현재가", won(sel["last_close"])) +
+                        kv("신호일(진입)", f'{sel["date"]:%Y-%m-%d}') + kv("진입가", won(entry)) + kv("마지막 저장 종가", won(sel["last_close"])) +
                         kv("수익률", f'<span class="{sign_cls(sel["ret_since"])}">{sel["ret_since"]:+.1f}%</span>') +
                         kv("신호 이후 최고가", won(mh) if mh else "-") +
                         kv("1차 / 2차 도달", f'{"✅" if sel["hit_1"] else "▫️"} / {"✅" if sel["hit_2"] else "▫️"}') +
@@ -583,9 +554,8 @@ if q and cands:
     search_mode = True
 S["m"] = market
 
-refresh_us = False
 if market == "us":
-    refresh_us = c_act.button("🌎 해외 추천 새로 분석", use_container_width=True)
+    c_act.caption("🛡️ 해외 추천은 자동갱신 · 조회 전용")
     try:
         validate_global_candidates("data")
     except (ValueError, OSError, KeyError, pd.errors.ParserError) as exc:
@@ -595,6 +565,19 @@ if market == "us":
         )
         st.caption(f"데이터 검사: {exc}")
         st.stop()
+
+# Saved OHLCV is never real-time. Only exchange-local weekday estimates
+# are available; exchange holidays may cause conservative warnings.
+if market == "us":
+    delayed = cached_global_freshness_warnings()
+    if delayed:
+        examples = ", ".join(f'{x["symbol"]}({x["date"]})' for x in delayed[:6])
+        tail = f" 외 {len(delayed)-6}개" if len(delayed) > 6 else ""
+        st.warning(
+            f"해외 저장 일봉 {len(delayed)}개 종목은 최신 거래일 확인이 필요합니다: "
+            f"{examples}{tail}. 현지 휴장일과 공급원 지연을 확인하세요."
+        )
+    st.caption("해외 추천은 GitHub 자동갱신 자료만 읽는 저장 종가 분석이며 실시간 신호가 아닙니다.")
 
 # ── 데이터/선택 종목 결정 ───────────────────────────────────────────────────
 sel, chart, err = None, None, None
@@ -611,6 +594,14 @@ if market == "kr":
         st.stop()
     names = dict(zip(listing["Code"], listing["Name"])) if not listing.empty else {}
     latest_date = meta["latest_date"]
+    kr_notice = session_notice(latest_date, "KR")
+    if kr_notice["warning"]:
+        st.warning(
+            f"한국 저장 시세 기준일은 {kr_notice['date']}입니다. "
+            "최근 장 종료 자료가 아직 반영되지 않았을 수 있습니다. "
+            "거래소 휴장일이나 자동갱신 지연을 확인해주세요."
+        )
+    st.caption("한국 신호는 저장된 거래일 종가 기준입니다. 실시간 가격이 아닙니다.")
     invalid_count = int(meta.get("excluded_invalid_histories", 0))
     recovered_count = int(meta.get("recovered_recent_histories", 0))
     if invalid_count:
@@ -651,14 +642,20 @@ if market == "kr":
         sel, chart = sel_from_kr_row(first, latest_date), load_kr_chart(sym)
 else:
     past = day > 0
-    if refresh_us:
-        with st.spinner("해외 종목을 분석하고 오늘~3일전 결과를 저장하고 있습니다..."):
-            fresh = scan_global_candidates(top_n)
-        if fresh.empty:
-            st.error("해외 추천 데이터를 받지 못했습니다.")
-        else:
-            save_global_candidates(fresh)
     all_cand = load_saved_global_candidates()
+    if not all_cand.empty and {"day_offset", "latest_date", "country"}.issubset(all_cand.columns):
+        current = all_cand.loc[all_cand["day_offset"].astype(int) == 0]
+        excluded = []
+        for idx, record in current.iterrows():
+            notice = session_notice(record["latest_date"], venue_for_country(record["country"]))
+            if notice["lag"] is not None and notice["lag"] >= 2:
+                excluded.append(idx)
+        if excluded:
+            st.warning(
+                f"잠정 최신 거래일보다 2영업일 이상 오래된 해외 후보 {len(excluded)}개를 "
+                "최근 거래일 추천에서 제외했습니다. 현지 휴장일·갱신 지연을 확인해주세요."
+            )
+            all_cand = all_cand.drop(index=excluded)
     if not all_cand.empty and "day_offset" not in all_cand.columns:
         all_cand["day_offset"] = 0
     cand_df = all_cand[all_cand["day_offset"].astype(int) == day].copy() if not all_cand.empty else pd.DataFrame()
@@ -698,6 +695,19 @@ else:
         except Exception as e:
             err = str(e)
 
+if sel is not None:
+    # For historical tabs, compare the last saved quote date, not the
+    # deliberately earlier signal-entry date.
+    country = sel.get("country", US_NAME_MAP.get(sel.get("symbol"), ("", "해외"))[1])
+    venue = "KR" if market == "kr" else venue_for_country(country)
+    selected_notice = session_notice(sel.get("latest_date", sel.get("date")), venue)
+    if selected_notice["warning"]:
+        st.warning(
+            f"{sel.get('symbol', '선택 종목')}의 마지막 저장 종가는 "
+            f"{selected_notice['date']} 기준입니다. "
+            "현재 실시간 가격이 아닙니다. 현지 휴장일·갱신 상태를 확인해주세요."
+        )
+
 # ── 상단 바 마무리 ──────────────────────────────────────────────────────────
 ver_txt = f'v9 · 데이터 기준 {meta["latest_date"]:%Y-%m-%d}' if meta else "v9"
 c_logo.markdown(f'<span class="logo">📈 종가매매 AI 스캐너</span><span class="ver">{ver_txt}</span>', unsafe_allow_html=True)
@@ -723,7 +733,7 @@ with left:
     with st.container(border=True):
         st.markdown(f'<div class="ph"><div class="pt">{panel_title}</div>{panel_tabs}</div>{sumline}', unsafe_allow_html=True)
         if market == "us" and not rows:
-            st.markdown('<div class="empty">이 날짜의 저장된 해외 추천이 없습니다.<br>오른쪽 위 <b>🌎 해외 추천 새로 분석</b>을 한 번 누르면 오늘·전일·2일전·3일전 결과가 함께 저장됩니다.<br>검색은 추천 목록과 관계없이 티커·회사명으로 사용할 수 있습니다.</div>',
+            st.markdown('<div class="empty">이 날짜의 저장된 해외 추천이 없습니다.<br>해외 추천은 GitHub 자동갱신에서 저장한 오늘·전일·2일 전·3일 전 자료를 읽습니다. 데이터가 없다면 갱신 상태를 확인해주세요.<br>검색은 추천 목록과 관계없이 티커·회사명으로 사용할 수 있습니다.</div>',
                         unsafe_allow_html=True)
         else:
             st.markdown(signals_table(rows, market, past, sym) + foot, unsafe_allow_html=True)

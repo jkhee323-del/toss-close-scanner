@@ -93,3 +93,37 @@ def session_notice(
         "warning": lag is None or lag >= 1,
         "status": "unknown_date" if lag is None else "possibly_stale" if lag >= 1 else "recent",
     }
+
+
+def find_stale_cached_symbols(
+    root,
+    universe: list[tuple[str, str, str]],
+    *,
+    now: datetime | pd.Timestamp | None = None,
+) -> list[dict]:
+    """Inspect only local saved price dates; never call an external provider."""
+    from pathlib import Path
+
+    root = Path(root)
+    problems: list[dict] = []
+    for symbol, _name, country in universe:
+        venue = venue_for_country(country)
+        file = root / f"{symbol.replace('/', '_')}.csv"
+        if venue is None:
+            continue  # Do not misclassify unknown market hours.
+        if not file.exists():
+            problems.append({"symbol": symbol, "country": country, "date": "없음", "lag": None})
+            continue
+        try:
+            dates = pd.read_csv(file, usecols=["date"])["date"]
+            if dates.empty:
+                raise ValueError("empty history")
+            latest = pd.to_datetime(dates, errors="coerce")
+            if latest.isna().any():
+                raise ValueError("invalid date")
+            notice = session_notice(latest.max(), venue, now=now)
+            if notice["warning"]:
+                problems.append({"symbol": symbol, "country": country, **notice})
+        except (OSError, ValueError, TypeError, KeyError, pd.errors.ParserError):
+            problems.append({"symbol": symbol, "country": country, "date": "확인 불가", "lag": None})
+    return problems

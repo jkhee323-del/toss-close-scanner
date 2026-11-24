@@ -59,3 +59,35 @@ def test_europe_and_japan_local_close_handling():
     now = pd.Timestamp("2026-11-24T22:58:00+09:00")
     assert estimated_last_completed_session("JP", now=now) == pd.Timestamp("2026-11-24")
     assert estimated_last_completed_session("EU", now=now) == pd.Timestamp("2026-11-23")
+
+
+def test_local_global_cache_reports_nvda_stale_without_modifying_files(tmp_path):
+    from src.market_freshness import find_stale_cached_symbols
+
+    now = pd.Timestamp("2026-11-24T22:58:00+09:00")
+    data = {
+        "MSFT": "2026-11-23",
+        "NVDA": "2026-11-20",
+    }
+    for sym, date in data.items():
+        path = tmp_path / f"{sym}.csv"
+        path.write_text("date,close\\n" + date + ",100\\n", encoding="utf-8")
+    universe = [("MSFT", "Microsoft", "미국"), ("NVDA", "NVIDIA", "미국")]
+    originals = {sym: (tmp_path / f"{sym}.csv").read_bytes() for sym in data}
+    stale = find_stale_cached_symbols(tmp_path, universe, now=now)
+    assert len(stale) == 1
+    assert stale[0]["symbol"] == "NVDA"
+    assert stale[0]["lag"] == 1
+    for sym in data:
+        assert (tmp_path / f"{sym}.csv").read_bytes() == originals[sym]
+
+
+def test_missing_cached_symbol_is_warning_not_silent_pass(tmp_path):
+    from src.market_freshness import find_stale_cached_symbols
+
+    report = find_stale_cached_symbols(
+        tmp_path, [("NVDA", "NVIDIA", "미국")],
+        now=pd.Timestamp("2026-11-24T22:58:00+09:00"),
+    )
+    assert report[0]["symbol"] == "NVDA"
+    assert report[0]["date"] == "없음"

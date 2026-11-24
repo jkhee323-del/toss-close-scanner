@@ -12,6 +12,8 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from src.indicators import add_indicators
+from src.global_cache_validation import validate_global_candidates
+from src.market_freshness import find_stale_cached_symbols, session_notice, venue_for_country
 from src.model import FEATURES
 from src.search import GLOBAL_SCAN_UNIVERSE, US_NAME_MAP, load_kr_listing, search_all, search_yahoo
 from src.signals import compute_scored_window, floor_to_tick, pick_signals, target_prices
@@ -301,36 +303,6 @@ def _us_snapshot(symbol: str, name: str, country: str, df: pd.DataFrame, day_off
     }
 
 
-@st.cache_data(show_spinner=False, ttl=1800)
-def scan_global_candidates(top_n: int = 14):
-    """해외 유니버스를 한 번만 내려받아 오늘~3일전 후보를 함께 만듭니다."""
-    from concurrent.futures import ThreadPoolExecutor, as_completed
-    rows = []
-    def one(item):
-        ticker, name, country = item
-        df = load_us_chart(ticker, 180)
-        got = []
-        for off in range(4):
-            snap = _us_snapshot(ticker, name, country, df, off)
-            got.append({k: snap[k] for k in ["symbol", "name", "country", "date", "latest_date", "day_offset",
-                "entry_price", "last_close", "change_pct", "trading_value", "volume_ratio", "rsi14", "ret_5d",
-                "near_20d_high", "candidate_score", "target_1", "target_2", "ret_since", "hit_1", "hit_2", "max_high_after"]})
-        return got
-    # 여러 종목을 동시에 받되 워커 수를 제한해 Yahoo 과부하/차단 위험을 낮춥니다.
-    with ThreadPoolExecutor(max_workers=6) as ex:
-        futures = [ex.submit(one, item) for item in GLOBAL_SCAN_UNIVERSE]
-        for fut in as_completed(futures):
-            try:
-                rows.extend(fut.result())
-            except Exception:
-                continue
-    if not rows:
-        return pd.DataFrame()
-    z = pd.DataFrame(rows)
-    return (z.sort_values(["day_offset", "candidate_score", "trading_value"], ascending=[True, False, False])
-             .groupby("day_offset", group_keys=False).head(top_n).reset_index(drop=True))
-
-
 def analyze_global_stock(symbol: str):
     symbol = symbol.strip().upper()
     df = load_us_chart(symbol, 180)
@@ -356,10 +328,10 @@ def sel_from_us_row(r) -> dict:
 GLOBAL_CACHE = Path("data/global_candidates.csv")
 
 
-def save_global_candidates(df):
-    if df is not None and not df.empty:
-        GLOBAL_CACHE.parent.mkdir(parents=True, exist_ok=True)
-        df.to_csv(GLOBAL_CACHE, index=False, encoding="utf-8-sig")
+@st.cache_data(show_spinner=False, ttl=15 * 60)
+def cached_global_freshness_warnings():
+    # Read-only scan of files maintained by the scheduled workflow.
+    return find_stale_cached_symbols("data/global_history", GLOBAL_SCAN_UNIVERSE)
 
 
 def load_saved_global_candidates():
@@ -574,9 +546,27 @@ if q and cands:
     search_mode = True
 S["m"] = market
 
-refresh_us = False
 if market == "us":
-    refresh_us = c_act.button("🌎 해외 추천 새로 분석", use_container_width=True)
+    c_act.caption("🛡️ 해외 추천은 자동갱신 · 조회 전용")
+
+    try:
+        validate_global_candidates("data")
+    except (ValueError, OSError, KeyError, pd.errors.ParserError) as exc:
+        st.error("해외 저장 추천 가격이 원본 종목별 일봉과 일치하지 않습니다. 추천을 중단했습니다.")
+        st.caption(f"검증 사유: {exc}")
+        st.stop()
+# Saved OHLCV is never real-time. Only exchange-local weekday estimates
+# are available; exchange holidays may cause conservative warnings.
+if market == "us":
+    delayed = cached_global_freshness_warnings()
+    if delayed:
+        examples = ", ".join(f'{x["symbol"]}({x["date"]})' for x in delayed[:6])
+        tail = f" 외 {len(delayed)-6}개" if len(delayed) > 6 else ""
+        st.warning(
+            f"해외 저장 일봉 {len(delayed)}개 종목은 최신 거래일 확인이 필요합니다: "
+            f"{examples}{tail}. 현지 휴장일과 공급원 지연을 확인하세요."
+        )
+    st.caption("해외 추천은 GitHub 자동갱신 자료만 읽는 저장 종가 분석이며 실시간 신호가 아닙니다.")
 
 # ── 데이터/선택 종목 결정 ───────────────────────────────────────────────────
 sel, chart, err = None, None, None
@@ -626,14 +616,20 @@ if market == "kr":
         sel, chart = sel_from_kr_row(first, latest_date), load_kr_chart(sym)
 else:
     past = day > 0
-    if refresh_us:
-        with st.spinner("해외 종목을 분석하고 오늘~3일전 결과를 저장하고 있습니다..."):
-            fresh = scan_global_candidates(top_n)
-        if fresh.empty:
-            st.error("해외 추천 데이터를 받지 못했습니다.")
-        else:
-            save_global_candidates(fresh)
     all_cand = load_saved_global_candidates()
+    if not all_cand.empty and {"day_offset", "latest_date", "country"}.issubset(all_cand.columns):
+        current = all_cand.loc[all_cand["day_offset"].astype(int) == 0]
+        excluded = []
+        for idx, record in current.iterrows():
+            notice = session_notice(record["latest_date"], venue_for_country(record["country"]))
+            if notice["lag"] is not None and notice["lag"] >= 2:
+                excluded.append(idx)
+        if excluded:
+            st.warning(
+                f"잠정 최신 거래일보다 2영업일 이상 오래된 해외 후보 {len(excluded)}개를 "
+                "최근 거래일 추천에서 제외했습니다. 현지 휴장일·갱신 지연을 확인해주세요."
+            )
+            all_cand = all_cand.drop(index=excluded)
     if not all_cand.empty and "day_offset" not in all_cand.columns:
         all_cand["day_offset"] = 0
     cand_df = all_cand[all_cand["day_offset"].astype(int) == day].copy() if not all_cand.empty else pd.DataFrame()

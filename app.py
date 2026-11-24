@@ -713,7 +713,7 @@ with left:
     with st.container(border=True):
         st.markdown(f'<div class="ph"><div class="pt">{panel_title}</div>{panel_tabs}</div>{sumline}', unsafe_allow_html=True)
         if market == "us" and not rows:
-            st.markdown('<div class="empty">이 날짜의 저장된 해외 추천이 없습니다.<br>오른쪽 위 <b>🌎 해외 추천 새로 분석</b>을 한 번 누르면 오늘·전일·2일전·3일전 결과가 함께 저장됩니다.<br>검색은 추천 목록과 관계없이 티커·회사명으로 사용할 수 있습니다.</div>',
+            st.markdown('<div class="empty">이 날짜의 저장된 해외 추천이 없습니다.<br>해외 추천은 GitHub 자동갱신에서 저장한 오늘·전일·2일 전·3일 전 자료를 읽습니다. 데이터가 없다면 갱신 상태를 확인해주세요.<br>검색은 추천 목록과 관계없이 티커·회사명으로 사용할 수 있습니다.</div>',
                         unsafe_allow_html=True)
         else:
             st.markdown(signals_table(rows, market, past, sym) + foot, unsafe_allow_html=True)

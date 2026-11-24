@@ -314,8 +314,8 @@ def sel_from_us_row(r) -> dict:
     d = pd.Timestamp(r["date"])
     close = float(r["entry_price"])
     return {
-        "market": "us", "symbol": str(r["symbol"]), "name": str(r["name"]), "country": str(r["country"]), "date": d, "latest_date": d,
-        "entry_price": close, "last_close": close, "change_pct": float(r["change_pct"]), "trading_value": float(r["trading_value"]),
+        "market": "us", "symbol": str(r["symbol"]), "name": str(r["name"]), "country": str(r["country"]), "date": d, "latest_date": pd.Timestamp(r.get("latest_date", d)),
+        "entry_price": close, "last_close": float(r.get("last_close", close)), "change_pct": float(r["change_pct"]), "trading_value": float(r["trading_value"]),
         "volume_ratio": float(r["volume_ratio"]), "rsi14": float(r["rsi14"]), "ret_5d": float(r["ret_5d"]),
         "near_20d_high": float(r["near_20d_high"]), "candidate_score": float(r["candidate_score"]),
         "target_1": float(r["target_1"]), "target_2": float(r["target_2"]),
@@ -369,7 +369,7 @@ def signals_table(rows: list[dict], mk: str, past: bool, selected: str) -> str:
         return '<div class="empty">조건을 만족하는 종목이 없습니다.</div>'
     code_h = "코드" if mk == "kr" else "티커"
     head = f'<th>{code_h}</th><th>종목명</th>'
-    head += '<th class="num">진입가</th><th class="num">현재가</th><th class="num">수익률</th>' if past else '<th class="num">현재가</th>'
+    head += '<th class="num">진입가</th><th class="num">마지막 저장 종가</th><th class="num">수익률</th>' if past else '<th class="num">마지막 저장 종가</th>'
     head += '<th class="num">1차익절</th><th class="num">2차익절</th><th></th>'
     body = []
     for r in rows:
@@ -435,7 +435,7 @@ def report_kr(sel: dict, meta: dict, cand_count: int):
     with a:
         st.markdown('<div class="card"><div class="ctitle">📋 종목 기본 정보</div>' +
                     kv("종목명", f'{escape(sel["name"])} ({escape(sel["symbol"])})') +
-                    kv("현재가", f'<b>{won(sel["last_close"])}</b>') +
+                    kv("마지막 저장 종가", f'<b>{won(sel["last_close"])}</b>') +
                     kv("신호일 등락", f'<span class="{sign_cls(sel["change_pct"])}">{sel["change_pct"]:+.2f}%</span>') +
                     kv("거래대금", f'{sel["trading_value"] / 1e8:,.0f}억원') +
                     kv("거래량 / 20일 평균", f'{sel["volume_ratio"]:.2f}배') +
@@ -455,7 +455,7 @@ def report_kr(sel: dict, meta: dict, cand_count: int):
         if sel["past"]:
             mh = sel["max_high_after"]
             st.markdown('<div class="card"><div class="ctitle">📈 신호 이후 결과</div>' +
-                        kv("신호일(진입)", f'{sel["date"]:%Y-%m-%d}') + kv("진입가", won(entry)) + kv("현재가", won(sel["last_close"])) +
+                        kv("신호일(진입)", f'{sel["date"]:%Y-%m-%d}') + kv("진입가", won(entry)) + kv("마지막 저장 종가", won(sel["last_close"])) +
                         kv("수익률", f'<span class="{sign_cls(sel["ret_since"])}">{sel["ret_since"]:+.1f}%</span>') +
                         kv("신호 이후 최고가", won(mh) if mh else "-") +
                         kv("1차 / 2차 도달", f'{"✅" if sel["hit_1"] else "▫️"} / {"✅" if sel["hit_2"] else "▫️"}') +
@@ -583,6 +583,14 @@ if market == "kr":
         st.stop()
     names = dict(zip(listing["Code"], listing["Name"])) if not listing.empty else {}
     latest_date = meta["latest_date"]
+    kr_notice = session_notice(latest_date, "KR")
+    if kr_notice["warning"]:
+        st.warning(
+            f"한국 저장 시세 기준일은 {kr_notice['date']}입니다. "
+            "최근 장 종료 자료가 아직 반영되지 않았을 수 있습니다. "
+            "거래소 휴장일이나 자동갱신 지연을 확인해주세요."
+        )
+    st.caption("한국 신호는 저장된 거래일 종가 기준입니다. 실시간 가격이 아닙니다.")
     sig, cand_count = pick_signals(window, day, top_n, min_value_100m * 100_000_000)
     day_date = meta["dates"].get(day, latest_date)
     if not sig.empty:
@@ -668,6 +676,19 @@ else:
             sel, chart = sel_from_us_row(first), load_us_chart(sym, 120)
         except Exception as e:
             err = str(e)
+
+if sel is not None:
+    # For historical tabs, compare the last saved quote date, not the
+    # deliberately earlier signal-entry date.
+    country = sel.get("country", US_NAME_MAP.get(sel.get("symbol"), ("", "해외"))[1])
+    venue = "KR" if market == "kr" else venue_for_country(country)
+    selected_notice = session_notice(sel.get("latest_date", sel.get("date")), venue)
+    if selected_notice["warning"]:
+        st.warning(
+            f"{sel.get('symbol', '선택 종목')}의 마지막 저장 종가는 "
+            f"{selected_notice['date']} 기준입니다. "
+            "현재 실시간 가격이 아닙니다. 현지 휴장일·갱신 상태를 확인해주세요."
+        )
 
 # ── 상단 바 마무리 ──────────────────────────────────────────────────────────
 ver_txt = f'v9 · 데이터 기준 {meta["latest_date"]:%Y-%m-%d}' if meta else "v9"

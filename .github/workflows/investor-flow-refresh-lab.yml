@@ -1,0 +1,38 @@
+name: Refresh verified KRX investor flow snapshot
+
+on:
+  push:
+    branches: [accuracy-lab]
+    paths:
+      - 'src/investor_flow_refresh.py'
+      - '.github/workflows/investor-flow-refresh-lab.yml'
+  workflow_dispatch:
+    inputs:
+      tickers:
+        description: Space-separated KRX symbols
+        required: true
+        default: '005930 000660'
+
+permissions:
+  contents: read
+
+jobs:
+  refresh:
+    if: github.ref == 'refs/heads/accuracy-lab'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: python -m pip install -r requirements.txt
+      - name: Collect and validate published KRX sessions
+        env:
+          KRX_ID: ${{ secrets.KRX_ID }}
+          KRX_PW: ${{ secrets.KRX_PW }}
+          WATCHLIST: ${{ inputs.tickers || '005930 000660' }}
+        run: |
+          read -ra tickers <<< "$WATCHLIST"
+          python -m src.investor_flow_refresh "${tickers[@]}" --output "$RUNNER_TEMP/krx-flow.json"

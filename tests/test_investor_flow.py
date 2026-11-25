@@ -60,3 +60,24 @@ def test_flow_requires_every_expected_session():
     assert summarize_investor_flows(raw.drop(dates[-3]), dates[-1], expected_sessions=dates) is None
     invalid_duplicate = raw.loc[[dates[-1]]].assign(기관합계=float("inf"))
     assert summarize_investor_flows(pd.concat([raw, invalid_duplicate]), dates[-1]) is None
+
+
+def test_refresh_keeps_previous_snapshot_if_any_symbol_is_incomplete(tmp_path, monkeypatch):
+    import json
+    import pytest
+
+    from src import investor_flow_refresh
+
+    dates = pd.bdate_range("2026-10-15", periods=20)
+    as_of = dates[-1].date().isoformat()
+    monkeypatch.setattr(investor_flow_refresh, "latest_published_flow_date", lambda: dates[-1])
+    valid = {"as_of": as_of, "sessions": 20, "foreign_net_krw": 7, "institution_net_krw": -7}
+    monkeypatch.setattr(investor_flow_refresh, "fetch_investor_flows", lambda *args, **kwargs: valid)
+    snapshot = tmp_path / "flows.json"
+    result = investor_flow_refresh.refresh(["005930"], dates, snapshot)
+    assert json.loads(snapshot.read_text()) == result
+    monkeypatch.setattr(investor_flow_refresh, "fetch_investor_flows",
+                        lambda ticker, *args, **kwargs: valid if ticker == "005930" else None)
+    with pytest.raises(RuntimeError, match="000660"):
+        investor_flow_refresh.refresh(["005930", "000660"], dates, snapshot)
+    assert json.loads(snapshot.read_text()) == result

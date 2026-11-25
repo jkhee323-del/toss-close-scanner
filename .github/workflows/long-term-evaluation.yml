@@ -34,6 +34,8 @@ jobs:
         run: python -m src.long_term_probability_lab --max-symbols 80
       - name: Quarterly walk-forward with fixed shrinkage model
         run: python -m src.long_term_walkforward --max-symbols 80
+      - name: Quarterly walk-forward with same-close stock ranks
+        run: python -m src.long_term_walkforward --max-symbols 80 --relative --output data/experiments/long_term_peer_rank.csv
       - name: Cost-aware top ten ranking holdout
         run: python -m src.long_term_holdout --max-symbols 80 --start 2025-01-01 --top 10
       - uses: actions/upload-artifact@v4
@@ -43,5 +45,6 @@ jobs:
           path: |
             data/experiments/long_term_probability_lab.csv
             data/experiments/long_term_walkforward.csv
+            data/experiments/long_term_peer_rank.csv
             data/experiments/long_term_holdout.csv
             data/experiments/long_term_holdout_matured_summary.csv

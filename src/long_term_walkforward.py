@@ -35,7 +35,11 @@ def prepare_history(path: Path) -> pd.DataFrame:
     return pd.concat(pieces).replace([np.inf, -np.inf], np.nan).dropna(subset=FEATURES)
 
 
-def evaluate(dataset: pd.DataFrame, horizon: int) -> list[dict]:
+def evaluate(dataset: pd.DataFrame, horizon: int, *, relative: bool = False) -> list[dict]:
+    if relative:
+        dataset = dataset.copy()
+        # Same-close observations only. Center each stock against its contemporaneous peers.
+        dataset[FEATURES] = dataset.groupby("date")[FEATURES].rank(pct=True)
     exit_col, net_col = f"exit_{horizon}", f"net_{horizon}"
     results = []
     for start, quarter in dataset.loc[dataset["date"] >= HOLDOUT_START].groupby(dataset["date"].dt.to_period("Q")):
@@ -51,7 +55,12 @@ def evaluate(dataset: pd.DataFrame, horizon: int) -> list[dict]:
         model = make_pipeline(StandardScaler(), LogisticRegression(C=0.01, max_iter=300))
         model.fit(train[FEATURES], truth_train)
         baseline = float(truth_train.mean())
-        score = 0.5 * model.predict_proba(quarter[FEATURES])[:, 1] + 0.5 * baseline
+        prediction = model.predict_proba(quarter[FEATURES])[:, 1]
+        if relative:
+            daily_mean = pd.Series(prediction, index=quarter.index).groupby(quarter["date"]).transform("mean")
+            score = np.clip(baseline + 0.5 * (prediction - daily_mean.to_numpy()), 0, 1)
+        else:
+            score = 0.5 * prediction + 0.5 * baseline
         truth = quarter.loc[matured, net_col] > 0
         selected = quarter.assign(score=score).sort_values(
             ["date", "score", "symbol"], ascending=[True, False, True]
@@ -79,6 +88,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--history-dir", type=Path, default=Path("data/history"))
     parser.add_argument("--max-symbols", type=int)
+    parser.add_argument("--relative", action="store_true", help="Evaluate the same-close peer rank model")
     parser.add_argument("--output", type=Path, default=Path("data/experiments/long_term_walkforward.csv"))
     args = parser.parse_args()
     frames = [prepare_history(path) for path in sample_history_paths(
@@ -88,7 +98,7 @@ def main() -> None:
     if not frames:
         raise SystemExit("No eligible OHLCV histories")
     dataset = pd.concat(frames, ignore_index=True)
-    result = pd.DataFrame([row for horizon in HORIZONS for row in evaluate(dataset, horizon)])
+    result = pd.DataFrame([row for horizon in HORIZONS for row in evaluate(dataset, horizon, relative=args.relative)])
     if result.empty or not result["status"].eq("evaluated").any():
         raise SystemExit("No mature walk-forward folds")
     args.output.parent.mkdir(parents=True, exist_ok=True)

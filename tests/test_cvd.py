@@ -78,3 +78,53 @@ def test_kis_execution_volume_checks_prevent_gaps_and_replays():
         normalize_kis_krx_trades(raw.iloc[[0, 0, 1, 2]])
     with pytest.raises(ValueError, match="방향"):
         normalize_kis_krx_trades(raw.assign(CCLD_DVSN="3"))
+
+
+def test_kis_message_parser_preserves_execution_order_and_side():
+    from src.kis_cvd_capture import parse_trades
+
+    def payload(time, side):
+        fields = [""] * 46
+        for index, value in {0: "005930", 33: "20261125", 1: time, 2: "90000",
+                             12: "3", 13: "103", 21: side}.items():
+            fields[index] = value
+        return "^".join(fields)
+
+    two = "^".join((payload("100001", "1"), payload("100002", "5")))
+    assert [record[-1] for record in parse_trades("0|H0STCNT0|2|" + two, "005930")] == ["1", "5"]
+    with pytest.raises(ValueError, match="Incomplete"):
+        parse_trades("0|H0STCNT0|1|" + two, "005930")
+    with pytest.raises(ValueError, match="different ticker"):
+        parse_trades("0|H0STCNT0|2|" + two, "000660")
+
+
+def test_kis_capture_calculates_delta_from_session_messages(monkeypatch):
+    import json
+    from contextlib import nullcontext
+    from unittest.mock import Mock
+
+    from src import kis_cvd_capture
+
+    def payload(time, volume, total, side):
+        fields = [""] * 46
+        for index, value in {0: "005930", 33: "20261125", 1: time, 2: "90000",
+                             12: volume, 13: total, 21: side}.items():
+            fields[index] = value
+        return "^".join(fields)
+
+    socket = Mock()
+    socket.recv.side_effect = [
+        '{"header":{"tr_id":"H0STCNT0"},"body":{"rt_cd":"0"}}',
+        '{"header":{"tr_id":"PINGPONG"}}',
+        "0|H0STCNT0|3|" + "^".join([
+            payload("090000", "100", "100", "3"), payload("090001", "3", "103", "1"),
+            payload("090002", "2", "105", "5"),
+        ]),
+        TimeoutError,
+    ]
+    monkeypatch.setattr(kis_cvd_capture, "connect", lambda *args, **kwargs: nullcontext(socket))
+    captured = kis_cvd_capture.capture("005930", 2, "local-test")
+    assert captured["cvd"].tolist() == [3, 1]
+    assert captured["source"].unique().tolist() == ["KIS_KRX_H0STCNT0"]
+    assert json.loads(socket.send.call_args.args[0])["body"]["input"]["tr_key"] == "005930"
+    socket.pong.assert_called_once()

@@ -6,6 +6,7 @@ This module intentionally has no fabricated fallback.
 """
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 
 
@@ -38,7 +39,7 @@ def compute_cvd(
         raise ValueError("CVD timestamps must have a consistent explicit timezone") from exc
     frame["volume"] = pd.to_numeric(frame["volume"], errors="coerce")
     frame["aggressor_side"] = frame["aggressor_side"].astype(str).str.lower().str.strip()
-    if frame["timestamp"].isna().any() or frame["volume"].isna().any() or (frame["volume"] <= 0).any():
+    if frame["timestamp"].isna().any() or not np.isfinite(frame["volume"]).all() or (frame["volume"] <= 0).any():
         raise ValueError("CVD requires valid timestamps and strictly positive trade volume")
     if not frame["aggressor_side"].isin(["buy", "sell"]).all():
         raise ValueError("Unknown aggressor side; cannot calculate actual CVD")

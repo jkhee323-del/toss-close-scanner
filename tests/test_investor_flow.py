@@ -34,3 +34,18 @@ def test_live_flow_fails_explicitly_without_secrets(monkeypatch):
     monkeypatch.delenv("KRX_PW", raising=False)
     with pytest.raises(RuntimeError, match="KRX_ID and KRX_PW"):
         fetch_investor_flows("005930", "2026-11-13")
+
+
+def test_duplicate_sessions_are_not_double_counted():
+    dates = list(pd.bdate_range("2026-11-02", periods=5))
+    df = pd.DataFrame({"기관합계": [100]*6, "외국인합계": [200]*6}, index=dates+[dates[-1]])
+    assert summarize_investor_flows(df, dates[-1]) is None
+
+
+def test_nonfinite_flows_are_not_counted():
+    dates = pd.bdate_range("2026-11-02", periods=6)
+    df = pd.DataFrame({"기관합계": [100]*5+[float("inf")], "외국인합계": [200]*6}, index=dates)
+    out = summarize_investor_flows(df, dates[-1])
+    assert out["sessions"] == 5
+    assert out["institution_net_krw"] == 500
+    assert out["foreign_net_krw"] == 1000

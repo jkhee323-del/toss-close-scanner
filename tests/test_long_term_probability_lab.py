@@ -133,3 +133,20 @@ def test_walkforward_purges_labels_maturing_on_or_after_refit():
     assert result["matured_rows"] == 7
     assert result["top10_selected"] == 8
     assert result["top10_matured"] == 7
+
+
+def test_symbol_holdout_excludes_test_stocks_from_training_history():
+    import numpy as np
+
+    from src.long_term_walkforward import evaluate
+    from src.long_term_probability_lab import FEATURES
+
+    count = 1006
+    dataset = pd.DataFrame({feature: np.linspace(-1, 1, count) for feature in FEATURES})
+    dataset["symbol"] = ["000001"] * 1000 + ["000002"] * 6
+    dataset["date"] = [pd.Timestamp("2024-12-01")] * 1003 + [pd.Timestamp("2025-01-02")] * 3
+    dataset["exit_20"] = [pd.Timestamp("2024-12-31")] * 1003 + [pd.Timestamp("2025-01-30")] * 3
+    dataset["net_20"] = np.where(np.arange(count) % 2 == 0, 0.01, -0.01)
+    [result] = evaluate(dataset, 20, relative=True, held_out={"000002"})
+    assert result["train_rows"] == 1000
+    assert result["scored_rows"] == 3

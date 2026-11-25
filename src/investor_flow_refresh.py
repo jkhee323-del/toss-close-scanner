@@ -41,6 +41,21 @@ def refresh(tickers: list[str], sessions: pd.DatetimeIndex, output: Path) -> dic
     return snapshot
 
 
+def load_snapshot(path: Path, ticker: str, as_of: str) -> dict | None:
+    """Read a trusted collector output only for the exact requested session."""
+    with path.open(encoding="utf-8") as handle:
+        snapshot = json.load(handle)
+    if not isinstance(snapshot, dict) or snapshot.get("source") != "KRX" or snapshot.get("as_of") != as_of:
+        return None
+    symbols = snapshot.get("symbols")
+    result = symbols.get(ticker) if isinstance(symbols, dict) else None
+    if not isinstance(result, dict) or result.get("as_of") != as_of or result.get("sessions") != 20:
+        return None
+    if any(type(result.get(column)) is not int for column in ("foreign_net_krw", "institution_net_krw")):
+        return None
+    return result
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("ticker", nargs="+")

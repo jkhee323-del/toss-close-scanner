@@ -81,3 +81,19 @@ def test_refresh_keeps_previous_snapshot_if_any_symbol_is_incomplete(tmp_path, m
     with pytest.raises(RuntimeError, match="000660"):
         investor_flow_refresh.refresh(["005930", "000660"], dates, snapshot)
     assert json.loads(snapshot.read_text()) == result
+
+
+def test_snapshot_is_bound_to_symbol_and_exact_session(tmp_path):
+    import json
+
+    from src.investor_flow_refresh import load_snapshot
+
+    date = "2026-11-24"
+    record = {"as_of": date, "sessions": 20, "foreign_net_krw": 5, "institution_net_krw": -5}
+    path = tmp_path / "flows.json"
+    snapshot = {"source": "KRX", "as_of": date, "symbols": {"005930": record}}
+    path.write_text(json.dumps(snapshot))
+    assert load_snapshot(path, "005930", date) == record
+    assert load_snapshot(path, "000660", date) is None
+    assert load_snapshot(path, "005930", "2026-11-23") is None
+    assert load_snapshot(path, "005930", "2026-11-25") is None

@@ -1,5 +1,6 @@
 
 import os
+from pathlib import Path
 
 import pandas as pd
 import streamlit as st
@@ -7,6 +8,7 @@ import streamlit as st
 from src.long_term_scanner import HISTORY_DIR, HORIZONS, get_recommendations
 from src.market_freshness import session_notice
 from src.investor_flow import fetch_investor_flows, latest_published_flow_date
+from src.investor_flow_refresh import load_snapshot
 from src.investor_flow_import import summarize_imported_flows
 from src.search import load_kr_listing, US_NAME_MAP
 
@@ -304,7 +306,9 @@ else:
                     except (ValueError, KeyError, TypeError, pd.errors.ParserError) as exc:
                         st.error(f"수급 CSV를 확인해주세요: {exc}")
 
-            if not (os.getenv("KRX_ID") and os.getenv("KRX_PW")):
+            snapshot_path = os.getenv("KRX_FLOW_SNAPSHOT")
+            live_configured = bool(os.getenv("KRX_ID") and os.getenv("KRX_PW"))
+            if not (snapshot_path or live_configured):
                 st.warning("KRX 수급 조회에 필요한 인증 설정이 없습니다. 배포 환경의 비밀 설정에 KRX_ID·KRX_PW를 등록한 뒤 이용할 수 있습니다.")
             else:
                 if st.checkbox("상위 10종목의 순매수 금액 조회", key="show_kr_investor_flow"):
@@ -319,8 +323,20 @@ else:
                             "기관 순매수(억원)": None,
                         }
                         try:
-                            data = load_verified_flow(str(selected["종목코드"]).zfill(6), str(selected["기준일"]), cutoff,
-                                                      (HISTORY_DIR / "005930.csv").stat().st_mtime_ns)
+                            ticker = str(selected["종목코드"]).zfill(6)
+                            scan_date = str(selected["기준일"])
+                            data = None
+                            if snapshot_path:
+                                reference = pd.read_csv(HISTORY_DIR / "005930.csv", usecols=["date"])
+                                eligible = reference.loc[reference["date"] <= min(scan_date, cutoff), "date"]
+                                if not eligible.empty:
+                                    try:
+                                        data = load_snapshot(Path(snapshot_path), ticker, eligible.max())
+                                    except (OSError, ValueError):
+                                        pass
+                            if data is None and live_configured:
+                                data = load_verified_flow(ticker, scan_date, cutoff,
+                                                          (HISTORY_DIR / "005930.csv").stat().st_mtime_ns)
                             if data is not None:
                                 entry["수급 기준일"] = data["as_of"]
                                 entry["외국인 순매수(억원)"] = round(data["foreign_net_krw"] / 100_000_000, 2)

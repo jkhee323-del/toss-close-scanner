@@ -1,6 +1,8 @@
 """종가매매 AI 스캐너 v9 - 신호표 + 차트 + 종목 리포트 화면 (오늘/전일/2일전/3일전 탭, 통합 검색)."""
 from __future__ import annotations
 
+import os
+import re
 from html import escape
 from pathlib import Path
 from urllib.parse import urlencode
@@ -790,15 +792,29 @@ with st.expander("🧪 실제 체결 데이터 CVD (CSV 업로드 · 실험 기�
     )
     cvd_file = st.file_uploader("체결 내역 CSV 파일", type=["csv"], key="cvd_trade_file")
     cvd_reset = st.checkbox("거래일별 CVD 초기화", value=True, key="cvd_reset_daily")
-    if cvd_file is not None:
-        if cvd_file.size > 5 * 1024 * 1024:
+    capture_dir = os.getenv("KIS_CVD_CAPTURE_DIR")
+    capture_path = None
+    if cvd_file is None and capture_dir and market == "kr" and re.fullmatch(r"[0-9]{6}", sym):
+        candidate = Path(capture_dir) / f"cvd-{sym}.csv"
+        if candidate.is_file():
+            capture_path = candidate
+    if cvd_file is not None or capture_path is not None:
+        if cvd_file is not None and cvd_file.size > 5 * 1024 * 1024:
             st.error("체결 파일은 5MB 이하만 지원합니다.")
         else:
             try:
                 columns = {"timestamp", "volume", "aggressor_side", "price", *KIS_EXECUTION_COLUMNS}
-                trade_df = pd.read_csv(
-                    cvd_file, usecols=lambda name: name in columns, dtype=dict.fromkeys(KIS_EXECUTION_COLUMNS, str)
-                )
+                if capture_path is not None:
+                    trade_df = pd.read_csv(
+                        capture_path, nrows=100_001, usecols=lambda name: name in columns | {"symbol", "source"},
+                        dtype={"symbol": str},
+                    )
+                    if not trade_df["symbol"].eq(sym).all() or not trade_df["source"].eq("KIS_KRX_H0STCNT0").all():
+                        raise ValueError("저장 파일의 종목 또는 데이터 공급원이 일치하지 않습니다.")
+                else:
+                    trade_df = pd.read_csv(
+                        cvd_file, usecols=lambda name: name in columns, dtype=dict.fromkeys(KIS_EXECUTION_COLUMNS, str)
+                    )
                 if len(trade_df) > 100_000:
                     raise ValueError("100,000건 이하 체결 기록만 지원합니다.")
                 if set(KIS_EXECUTION_COLUMNS) & set(trade_df.columns):
@@ -807,6 +823,10 @@ with st.expander("🧪 실제 체결 데이터 CVD (CSV 업로드 · 실험 기�
                 if delta_df.empty:
                     st.info("체결 데이터가 없습니다.")
                 else:
+                    if capture_path is not None:
+                        start = delta_df["timestamp"].iloc[0].strftime("%Y-%m-%d %H:%M:%S")
+                        end = delta_df["timestamp"].iloc[-1].strftime("%Y-%m-%d %H:%M:%S")
+                        st.caption(f"KIS KRX 저장 체결 · {sym} · {start} ~ {end} (한국시간)")
                     st.metric("마지막 CVD(수량 기준)", f"{delta_df['cvd'].iloc[-1]:,.0f}")
                     cvd_chart = delta_df.groupby("timestamp", as_index=False)["cvd"].last()
                     st.line_chart(cvd_chart.set_index("timestamp")["cvd"])
@@ -820,7 +840,7 @@ with st.expander("🧪 실제 체결 데이터 CVD (CSV 업로드 · 실험 기�
                         else:
                             st.dataframe(signals.tail(20), hide_index=True)
                     st.caption("매수 주도 수량 − 매도 주도 수량의 누적값입니다. 가격 상승 확률이 아닙니다.")
-            except (ValueError, KeyError, TypeError, OverflowError, pd.errors.ParserError) as exc:
+            except (OSError, ValueError, KeyError, TypeError, OverflowError, pd.errors.ParserError) as exc:
                 st.error(f"체결 데이터 형식을 확인해주세요: {exc}")
 
 # ── URL 동기화 (새로고침해도 같은 화면) ─────────────────────────────────────

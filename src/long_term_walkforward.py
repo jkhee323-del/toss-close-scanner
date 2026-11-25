@@ -35,16 +35,20 @@ def prepare_history(path: Path) -> pd.DataFrame:
     return pd.concat(pieces).replace([np.inf, -np.inf], np.nan).dropna(subset=FEATURES)
 
 
-def evaluate(dataset: pd.DataFrame, horizon: int, *, relative: bool = False) -> list[dict]:
+def evaluate(dataset: pd.DataFrame, horizon: int, *, relative: bool = False, held_out: set[str] | None = None) -> list[dict]:
+    test_universe = dataset if held_out is None else dataset.loc[dataset["symbol"].isin(held_out)]
+    train_universe = dataset if held_out is None else dataset.loc[~dataset["symbol"].isin(held_out)]
     if relative:
-        dataset = dataset.copy()
-        # Same-close observations only. Center each stock against its contemporaneous peers.
-        dataset[FEATURES] = dataset.groupby("date")[FEATURES].rank(pct=True)
+        # Same-close peer ranks. Held-out stocks never enter training ranks.
+        train_universe = train_universe.assign(**train_universe.groupby("date")[FEATURES].rank(pct=True))
+        test_universe = test_universe.assign(**test_universe.groupby("date")[FEATURES].rank(pct=True))
     exit_col, net_col = f"exit_{horizon}", f"net_{horizon}"
     results = []
-    for start, quarter in dataset.loc[dataset["date"] >= HOLDOUT_START].groupby(dataset["date"].dt.to_period("Q")):
+    for start, quarter in test_universe.loc[test_universe["date"] >= HOLDOUT_START].groupby(
+        test_universe["date"].dt.to_period("Q")
+    ):
         boundary = start.start_time
-        train = dataset.loc[(dataset[exit_col] < boundary) & dataset[net_col].notna()]
+        train = train_universe.loc[(train_universe[exit_col] < boundary) & train_universe[net_col].notna()]
         truth_train = train[net_col] > 0
         matured = quarter[net_col].notna()
         if len(train) < 1000 or truth_train.nunique() < 2 or not matured.any():
@@ -88,6 +92,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--history-dir", type=Path, default=Path("data/history"))
     parser.add_argument("--max-symbols", type=int)
+    parser.add_argument("--symbol-folds", action="store_true", help="Evaluate three disjoint held-out symbol folds")
     parser.add_argument("--relative", action="store_true", help="Evaluate the same-close peer rank model")
     parser.add_argument("--output", type=Path, default=Path("data/experiments/long_term_walkforward.csv"))
     args = parser.parse_args()
@@ -98,7 +103,18 @@ def main() -> None:
     if not frames:
         raise SystemExit("No eligible OHLCV histories")
     dataset = pd.concat(frames, ignore_index=True)
-    result = pd.DataFrame([row for horizon in HORIZONS for row in evaluate(dataset, horizon, relative=args.relative)])
+    if args.symbol_folds:
+        ranked = sample_history_paths([Path(symbol) for symbol in dataset["symbol"].unique()],
+                                      dataset["symbol"].nunique(), seed="held-out-symbols-v1")
+        groups = [set(path.stem for path in ranked[i::3]) for i in range(3)]
+    else:
+        groups = [None]
+    result = pd.DataFrame([
+        {"symbol_fold": fold, **row}
+        for fold, group in enumerate(groups, 1)
+        for horizon in HORIZONS
+        for row in evaluate(dataset, horizon, relative=args.relative, held_out=group)
+    ])
     if result.empty or not result["status"].eq("evaluated").any():
         raise SystemExit("No mature walk-forward folds")
     args.output.parent.mkdir(parents=True, exist_ok=True)

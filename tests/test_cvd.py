@@ -40,3 +40,9 @@ def test_cvd_can_reset_at_exchange_session_boundary():
 def test_cvd_rejects_ambiguous_or_missing_data(data):
     with pytest.raises(ValueError):
         compute_cvd(pd.DataFrame(data))
+
+
+@pytest.mark.parametrize("volume", [float("inf"), float("-inf"), float("nan")])
+def test_cvd_rejects_nonfinite_volume(volume):
+    with pytest.raises(ValueError):
+        compute_cvd(pd.DataFrame({"timestamp": ["2026-11-17T09:00:00+09:00"], "volume": [volume], "aggressor_side": ["buy"]}))

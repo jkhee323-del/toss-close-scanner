@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 
+import numpy as np
 import pandas as pd
 
 
@@ -30,7 +31,11 @@ def summarize_investor_flows(raw: pd.DataFrame, end_date: pd.Timestamp, lookback
     for column in ["기관합계", "외국인합계"]:
         frame[column] = pd.to_numeric(frame[column], errors="coerce")
     frame = frame.loc[frame.index.normalize() <= pd.Timestamp(end_date).normalize()]
-    frame = frame.dropna().sort_index().tail(lookback)
+    frame = frame.replace([np.inf, -np.inf], np.nan).dropna()
+    # Duplicate sessions cannot be counted twice or silently reconciled.
+    if frame.index.normalize().duplicated().any():
+        return None
+    frame = frame.sort_index().tail(lookback)
     if len(frame) < 5:
         return None
     return {

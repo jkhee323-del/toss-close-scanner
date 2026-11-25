@@ -25,6 +25,18 @@ and trails the prior candidate's Brier at 60 and 120 sessions. The prior period
 informed the decision to investigate a second variant. Keep these settings
 fixed and evaluate against future untouched quarters before promotion.
 
+The deterministic 80-symbol sample used in CI provides a sensitivity check
+on overlapping data:
+
+| Sessions | Candidate Brier | Constant Brier |
+| --- | ---: | ---: |
+| 20 | 0.251743 | 0.251795 |
+| 60 | 0.258665 | 0.258782 |
+| 120 | 0.273960 | 0.273004 |
+| 240 | 0.283716 | 0.281112 |
+
+The 120- and 240-session improvements do not hold on the smaller universe.
+
 ## KRX investor flows
 
 `python -m src.investor_flow_refresh 005930 000660 --output /private/lab/krx-flow.json`

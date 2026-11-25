@@ -51,3 +51,39 @@ def compute_cvd(
     else:
         frame["cvd"] = frame["signed_volume"].cumsum()
     return frame
+
+
+def cvd_divergence(trades: pd.DataFrame, *, bar_minutes: int = 5) -> pd.DataFrame:
+    """Compare the closing trade price and signed volume over adjacent time bars.
+
+    Results are timestamped at bar close. The last observed bar of each
+    session is excluded because the input may end before that bar closes.
+    """
+    if bar_minutes <= 0:
+        raise ValueError("CVD divergence requires a positive bar length")
+    delta = compute_cvd(trades, reset_each_session=True)
+    price = pd.to_numeric(trades["price"], errors="coerce")
+    if not np.isfinite(price).all() or (price <= 0).any():
+        raise ValueError("CVD divergence requires positive execution prices")
+    if delta.empty:
+        return pd.DataFrame(columns=["bar_end", "price_change", "cvd_change", "divergence"])
+    # Use positional ordering so callers may supply non-unique DataFrame indexes.
+    order = pd.to_datetime(trades["timestamp"], utc=True).reset_index(drop=True).sort_values(kind="stable").index
+    delta["price"] = price.to_numpy()[order]
+    interval = pd.Timedelta(minutes=bar_minutes)
+    delta["bar_end"] = delta["timestamp"].dt.floor(interval) + interval
+    bars = delta.groupby(["session_date", "bar_end"], as_index=False).agg(
+        price=("price", "last"), cvd=("cvd", "last")
+    )
+    by_session = bars.groupby("session_date")
+    bars["price_change"] = by_session["price"].diff()
+    bars["cvd_change"] = by_session["cvd"].diff()
+    bars["divergence"] = np.select(
+        [(bars["price_change"] < 0) & (bars["cvd_change"] > 0),
+         (bars["price_change"] > 0) & (bars["cvd_change"] < 0)],
+        ["bullish", "bearish"], default="none",
+    )
+    complete_pair = (by_session["bar_end"].diff() == interval) & (
+        bars["bar_end"] < by_session["bar_end"].transform("max")
+    )
+    return bars.loc[complete_pair, ["bar_end", "price_change", "cvd_change", "divergence"]]

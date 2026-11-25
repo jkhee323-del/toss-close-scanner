@@ -92,3 +92,44 @@ def test_prob_lab_rejects_insufficient_recent_history_after_corruption(tmp_path)
     path = tmp_path / "000001.csv"
     frame.to_csv(path, index=False)
     assert prepare_symbol(path, 20).empty
+
+
+def test_walkforward_does_not_bridge_a_future_invalid_bar(tmp_path):
+    from src.long_term_walkforward import prepare_history
+
+    frame = pd.DataFrame({
+        "date": pd.bdate_range("2024-01-01", periods=300),
+        "open": 100.0, "high": 102.0, "low": 99.0,
+        "close": 101.0, "volume": 10000,
+    })
+    path = tmp_path / "000001.csv"
+    frame.to_csv(path, index=False)
+    clean = prepare_history(path).set_index("date")
+    frame.loc[100, "close"] = 0
+    frame.to_csv(path, index=False)
+    broken = prepare_history(path).set_index("date")
+    early = frame.loc[90, "date"]
+    assert broken.loc[early, "ret_20d"] == clean.loc[early, "ret_20d"]
+    assert pd.isna(broken.loc[early, "exit_20"])
+    assert pd.notna(broken.loc[frame.loc[75, "date"], "exit_20"])
+    assert frame.loc[110, "date"] not in broken.index
+
+
+def test_walkforward_purges_labels_maturing_on_or_after_refit():
+    import numpy as np
+
+    from src.long_term_walkforward import evaluate
+    from src.long_term_probability_lab import FEATURES
+
+    count = 1010
+    dataset = pd.DataFrame({feature: np.linspace(-1, 1, count) for feature in FEATURES})
+    dataset["symbol"] = [f"{i:06}" for i in range(count)]
+    dataset["date"] = [pd.Timestamp("2024-12-01")] * 1002 + [pd.Timestamp("2025-01-02")] * 8
+    dataset["exit_20"] = [pd.Timestamp("2024-12-31")] * 1000 + [pd.Timestamp("2025-01-01")] * 2 + [pd.Timestamp("2025-01-30")] * 8
+    dataset["net_20"] = np.where(np.arange(count) % 2 == 0, 0.01, -0.01)
+    dataset.loc[count - 1, ["exit_20", "net_20"]] = [pd.NaT, np.nan]
+    [result] = evaluate(dataset, 20)
+    assert result["train_rows"] == 1000
+    assert result["matured_rows"] == 7
+    assert result["top10_selected"] == 8
+    assert result["top10_matured"] == 7

@@ -20,7 +20,13 @@ def latest_published_flow_date(now: pd.Timestamp | None = None) -> pd.Timestamp:
     return cutoff
 
 
-def summarize_investor_flows(raw: pd.DataFrame, end_date: pd.Timestamp, lookback: int = 20) -> dict | None:
+def summarize_investor_flows(
+    raw: pd.DataFrame,
+    end_date: pd.Timestamp,
+    lookback: int = 20,
+    *,
+    expected_sessions: pd.DatetimeIndex | None = None,
+) -> dict | None:
     if raw is None or raw.empty or lookback <= 0:
         return None
     if not {"기관합계", "외국인합계"}.issubset(raw.columns):
@@ -31,11 +37,21 @@ def summarize_investor_flows(raw: pd.DataFrame, end_date: pd.Timestamp, lookback
     for column in ["기관합계", "외국인합계"]:
         frame[column] = pd.to_numeric(frame[column], errors="coerce")
     frame = frame.loc[frame.index.normalize() <= pd.Timestamp(end_date).normalize()]
-    frame = frame.replace([np.inf, -np.inf], np.nan).dropna()
-    # Duplicate sessions cannot be counted twice or silently reconciled.
-    if frame.index.normalize().duplicated().any():
+    frame.index = frame.index.normalize()
+    # Check duplicates before dropping invalid amounts.
+    if frame.index.duplicated().any():
         return None
-    frame = frame.sort_index().tail(lookback)
+    frame = frame.replace([np.inf, -np.inf], np.nan).dropna().sort_index()
+    if expected_sessions is not None:
+        cutoff = pd.Timestamp(end_date).normalize()
+        required = expected_sessions[expected_sessions <= cutoff].sort_values()[-lookback:]
+        if len(required) != lookback or required.has_duplicates or not required.isin(frame.index).all():
+            return None
+        frame = frame.loc[frame.index >= required[0]]
+        if not frame.index.equals(required) or (frame % 1 != 0).any().any():
+            return None
+    else:
+        frame = frame.tail(lookback)
     if len(frame) < 5:
         return None
     return {
@@ -46,7 +62,13 @@ def summarize_investor_flows(raw: pd.DataFrame, end_date: pd.Timestamp, lookback
     }
 
 
-def fetch_investor_flows(ticker: str, scan_date: str, lookback: int = 20) -> dict | None:
+def fetch_investor_flows(
+    ticker: str,
+    scan_date: str,
+    lookback: int = 20,
+    *,
+    expected_sessions: pd.DatetimeIndex | None = None,
+) -> dict | None:
     """Fetch a bounded range and never use data after the scan's reference date."""
     # pykrx KRX investor endpoints require credentials on the current provider.
     # Never attempt anonymous login or report a missing response as zero flow.
@@ -59,4 +81,4 @@ def fetch_investor_flows(ticker: str, scan_date: str, lookback: int = 20) -> dic
     end = min(pd.Timestamp(scan_date).normalize(), latest_published_flow_date())
     start = end - pd.Timedelta(days=max(45, 3 * lookback))
     raw = stock.get_market_trading_value_by_date(start.strftime("%Y%m%d"), end.strftime("%Y%m%d"), ticker)
-    return summarize_investor_flows(raw, end, lookback=lookback)
+    return summarize_investor_flows(raw, end, lookback=lookback, expected_sessions=expected_sessions)

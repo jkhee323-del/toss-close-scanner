@@ -4,11 +4,19 @@ import os
 import pandas as pd
 import streamlit as st
 
-from src.long_term_scanner import HORIZONS, get_recommendations
+from src.long_term_scanner import HISTORY_DIR, HORIZONS, get_recommendations
 from src.market_freshness import session_notice
-from src.investor_flow import fetch_investor_flows
+from src.investor_flow import fetch_investor_flows, latest_published_flow_date
 from src.investor_flow_import import summarize_imported_flows
 from src.search import load_kr_listing, US_NAME_MAP
+
+
+@st.cache_data(ttl=900, show_spinner=False)
+def load_verified_flow(ticker: str, scan_date: str, cutoff: str, reference_mtime: int):
+    reference = pd.read_csv(HISTORY_DIR / "005930.csv", usecols=["date"])
+    return fetch_investor_flows(
+        ticker, min(scan_date, cutoff), expected_sessions=pd.DatetimeIndex(reference["date"])
+    )
 
 
 st.set_page_config(
@@ -301,6 +309,7 @@ else:
             else:
                 if st.checkbox("상위 10종목의 순매수 금액 조회", key="show_kr_investor_flow"):
                     flow_rows = []
+                    cutoff = latest_published_flow_date().strftime("%Y-%m-%d")
                     for _, selected in result.head(10).iterrows():
                         entry = {
                             "기업명": selected["기업명"],
@@ -310,7 +319,8 @@ else:
                             "기관 순매수(억원)": None,
                         }
                         try:
-                            data = fetch_investor_flows(selected["종목코드"], selected["기준일"])
+                            data = load_verified_flow(str(selected["종목코드"]).zfill(6), str(selected["기준일"]), cutoff,
+                                                      (HISTORY_DIR / "005930.csv").stat().st_mtime_ns)
                             if data is not None:
                                 entry["수급 기준일"] = data["as_of"]
                                 entry["외국인 순매수(억원)"] = round(data["foreign_net_krw"] / 100_000_000, 2)
@@ -319,7 +329,7 @@ else:
                             pass  # Keep unavailable values null, never silently report zero.
                         flow_rows.append(entry)
                     st.dataframe(pd.DataFrame(flow_rows), hide_index=True, width="stretch")
-                    st.caption("양수는 순매수, 음수는 순매도입니다. 거래소 제공 오류 시 자료 없음으로 표시합니다.")
+                    st.caption("양수는 순매수, 음수는 순매도입니다. 저장된 시장 거래일 기준으로 20거래일치 자료가 모두 있을 때만 집계합니다.")
 
 st.info(
     "이 점수는 기술적 분석 점수입니다. "

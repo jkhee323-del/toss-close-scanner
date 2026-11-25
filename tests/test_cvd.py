@@ -46,3 +46,35 @@ def test_cvd_rejects_ambiguous_or_missing_data(data):
 def test_cvd_rejects_nonfinite_volume(volume):
     with pytest.raises(ValueError):
         compute_cvd(pd.DataFrame({"timestamp": ["2026-11-17T09:00:00+09:00"], "volume": [volume], "aggressor_side": ["buy"]}))
+
+
+def test_divergence_uses_completed_adjacent_bars_only():
+    from src.cvd import cvd_divergence
+
+    trades = pd.DataFrame({
+        "timestamp": ["2026-11-20T09:01:00+09:00", "2026-11-20T09:06:00+09:00",
+                      "2026-11-20T09:16:00+09:00", "2026-11-20T09:21:00+09:00"],
+        "volume": [1, 3, 2, 1], "aggressor_side": ["buy", "buy", "sell", "buy"],
+        "price": [100, 99, 101, 100],
+    })
+    signals = cvd_divergence(trades.iloc[::-1])
+    assert signals["divergence"].tolist() == ["bullish"]
+    assert signals["bar_end"].dt.strftime("%H:%M").tolist() == ["09:10"]
+
+
+def test_kis_execution_volume_checks_prevent_gaps_and_replays():
+    from src.kis_trades import normalize_kis_krx_trades
+
+    raw = pd.DataFrame({
+        "MKSC_SHRN_ISCD": ["005930"] * 3, "BSOP_DATE": ["20261120"] * 3,
+        "STCK_CNTG_HOUR": ["090001", "090001", "090002"],
+        "CCLD_DVSN": ["1", "5", "1"], "STCK_PRPR": [100, 101, 102],
+        "CNTG_VOL": [2, 3, 4], "ACML_VOL": [102, 105, 109],
+    })
+    assert compute_cvd(normalize_kis_krx_trades(raw))["cvd"].tolist() == [2, -1, 3]
+    with pytest.raises(ValueError, match="누락·중복"):
+        normalize_kis_krx_trades(raw.drop(1))
+    with pytest.raises(ValueError, match="누락·중복"):
+        normalize_kis_krx_trades(raw.iloc[[0, 0, 1, 2]])
+    with pytest.raises(ValueError, match="방향"):
+        normalize_kis_krx_trades(raw.assign(CCLD_DVSN="3"))

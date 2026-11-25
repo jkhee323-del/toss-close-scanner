@@ -14,7 +14,8 @@ import streamlit as st
 from src.indicators import add_indicators
 from src.global_cache_validation import validate_global_candidates
 from src.market_freshness import find_stale_cached_symbols, session_notice, venue_for_country
-from src.cvd import compute_cvd
+from src.cvd import compute_cvd, cvd_divergence
+from src.kis_trades import KIS_EXECUTION_COLUMNS, normalize_kis_krx_trades
 from src.model import FEATURES
 from src.search import GLOBAL_SCAN_UNIVERSE, US_NAME_MAP, load_kr_listing, search_all, search_yahoo
 from src.signals import compute_scored_window, floor_to_tick, pick_signals, target_prices
@@ -782,7 +783,8 @@ with st.container(border=True):
 # ── 실험실: 실제 체결 방향이 있는 CSV만 CVD 계산 ──────────────────────────────
 with st.expander("🧪 실제 체결 데이터 CVD (CSV 업로드 · 실험 기능)"):
     st.caption(
-        "필수 열: timestamp(타임존 포함), volume, aggressor_side(buy/sell). "
+        "필수 열: timestamp(타임존 포함), volume, aggressor_side(buy/sell). 선택 열: price(체결가, 5분 다이버전스 분석). "
+        "KIS KRX 체결 내역 CSV도 지원합니다. CVD는 파일의 첫 체결부터 집계합니다. "
         "실제 매수·매도 주도 방향이 없는 일봉·OBV로는 CVD를 계산하지 않습니다. "
         "파일은 이 화면에서만 분석하고 서버 저장 파일로 기록하지 않습니다."
     )
@@ -793,9 +795,14 @@ with st.expander("🧪 실제 체결 데이터 CVD (CSV 업로드 · 실험 기�
             st.error("체결 파일은 5MB 이하만 지원합니다.")
         else:
             try:
-                trade_df = pd.read_csv(cvd_file, usecols=["timestamp", "volume", "aggressor_side"])
+                columns = {"timestamp", "volume", "aggressor_side", "price", *KIS_EXECUTION_COLUMNS}
+                trade_df = pd.read_csv(
+                    cvd_file, usecols=lambda name: name in columns, dtype=dict.fromkeys(KIS_EXECUTION_COLUMNS, str)
+                )
                 if len(trade_df) > 100_000:
                     raise ValueError("100,000건 이하 체결 기록만 지원합니다.")
+                if set(KIS_EXECUTION_COLUMNS) & set(trade_df.columns):
+                    trade_df = normalize_kis_krx_trades(trade_df)
                 delta_df = compute_cvd(trade_df, reset_each_session=cvd_reset)
                 if delta_df.empty:
                     st.info("체결 데이터가 없습니다.")
@@ -803,8 +810,17 @@ with st.expander("🧪 실제 체결 데이터 CVD (CSV 업로드 · 실험 기�
                     st.metric("마지막 CVD(수량 기준)", f"{delta_df['cvd'].iloc[-1]:,.0f}")
                     cvd_chart = delta_df.groupby("timestamp", as_index=False)["cvd"].last()
                     st.line_chart(cvd_chart.set_index("timestamp")["cvd"])
+                    if "price" in trade_df:
+                        signals = cvd_divergence(trade_df)
+                        signals = signals.loc[signals["divergence"] != "none"].replace(
+                            {"bullish": "가격 하락·CVD 상승", "bearish": "가격 상승·CVD 하락"}
+                        )
+                        if signals.empty:
+                            st.info("비교 가능한 연속 5분봉에서 다이버전스가 확인되지 않았습니다.")
+                        else:
+                            st.dataframe(signals.tail(20), hide_index=True)
                     st.caption("매수 주도 수량 − 매도 주도 수량의 누적값입니다. 가격 상승 확률이 아닙니다.")
-            except (ValueError, KeyError, TypeError, pd.errors.ParserError) as exc:
+            except (ValueError, KeyError, TypeError, OverflowError, pd.errors.ParserError) as exc:
                 st.error(f"체결 데이터 형식을 확인해주세요: {exc}")
 
 # ── URL 동기화 (새로고침해도 같은 화면) ─────────────────────────────────────

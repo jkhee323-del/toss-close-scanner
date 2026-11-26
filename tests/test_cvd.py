@@ -128,3 +128,19 @@ def test_kis_capture_calculates_delta_from_session_messages(monkeypatch):
     assert captured["source"].unique().tolist() == ["KIS_KRX_H0STCNT0"]
     assert json.loads(socket.send.call_args.args[0])["body"]["input"]["tr_key"] == "005930"
     socket.pong.assert_called_once()
+
+
+def test_saved_exchange_totals_detect_removed_and_replayed_executions():
+    trades = pd.DataFrame({
+        "timestamp": ["2026-11-25T09:00:01+09:00", "2026-11-25T09:00:02+09:00",
+                      "2026-11-25T09:00:03+09:00", "2026-11-26T09:00:01+09:00"],
+        "volume": [3, 2, 4, 7], "aggressor_side": ["buy", "sell", "buy", "sell"],
+        "accumulated_volume": [103, 105, 109, 7],
+    })
+    assert compute_cvd(trades)["cvd"].tolist() == [3, 1, 5, -2]
+    with pytest.raises(ValueError, match="Missing, duplicate"):
+        compute_cvd(trades.drop(1))
+    with pytest.raises(ValueError, match="Missing, duplicate"):
+        compute_cvd(trades.iloc[[0, 1, 1, 2, 3]])
+    with pytest.raises(ValueError, match="Invalid exchange"):
+        compute_cvd(trades.assign(accumulated_volume=float("inf")))

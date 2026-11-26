@@ -17,7 +17,14 @@ from .lab_sampling import sample_history_paths
 from .long_term_probability_lab import COST, FEATURES, HOLDOUT_START, HORIZONS
 
 
-def prepare_history(path: Path) -> pd.DataFrame:
+LONG_FEATURES = FEATURES + [
+    "ret_60d", "ret_120d", "ret_240d", "ma120_distance",
+    "ma240_distance", "volatility_120d", "drawdown_240d",
+]
+
+
+def prepare_history(path: Path, *, long_features: bool = False) -> pd.DataFrame:
+    columns = LONG_FEATURES if long_features else FEATURES
     bars, valid = valid_ohlcv_rows(pd.read_csv(path))
     outcome_columns = [f"{kind}_{horizon}" for horizon in HORIZONS for kind in ("exit", "net")]
     pieces = []
@@ -26,22 +33,69 @@ def prepare_history(path: Path) -> pd.DataFrame:
             continue
         frame = add_indicators(segment)
         frame["symbol"] = path.stem
+        if long_features:
+            for days in (60, 120, 240):
+                frame[f"ret_{days}d"] = frame["close"].pct_change(days, fill_method=None)
+            for days in (120, 240):
+                frame[f"ma{days}_distance"] = frame["close"] / frame["close"].rolling(days).mean() - 1
+            frame["volatility_120d"] = frame["ret_1d"].rolling(120).std()
+            frame["drawdown_240d"] = frame["close"] / frame["close"].rolling(240).max() - 1
         for horizon in HORIZONS:
             frame[f"exit_{horizon}"] = frame["date"].shift(-horizon)
             frame[f"net_{horizon}"] = frame["close"].shift(-horizon) / frame["open"].shift(-1) - 1 - COST
-        pieces.append(frame[["symbol", "date", *FEATURES, *outcome_columns]])
+        pieces.append(frame[["symbol", "date", *columns, *outcome_columns]])
     if not pieces:
         return pd.DataFrame()
-    return pd.concat(pieces).replace([np.inf, -np.inf], np.nan).dropna(subset=FEATURES)
+    return pd.concat(pieces).replace([np.inf, -np.inf], np.nan).dropna(subset=columns)
 
 
-def evaluate(dataset: pd.DataFrame, horizon: int, *, relative: bool = False, held_out: set[str] | None = None) -> list[dict]:
+def validation_blend(train: pd.DataFrame, columns: list[str], horizon: int, *, relative: bool) -> float:
+    """Estimate a bounded blend using an inner, purged chronological window."""
+    dates = train["date"].sort_values().unique()
+    if len(dates) < 252:
+        return 0.0
+    validation_start = dates[-126]
+    inner = train.loc[train[f"exit_{horizon}"] < validation_start]
+    validation = train.loc[train["date"] >= validation_start]
+    target = inner[f"net_{horizon}"] > 0
+    if len(inner) < 1000 or target.nunique() < 2 or validation.empty:
+        return 0.0
+    model = make_pipeline(StandardScaler(), LogisticRegression(C=0.01, max_iter=300))
+    model.fit(inner[columns], target)
+    predicted = model.predict_proba(validation[columns])[:, 1]
+    baseline = float(target.mean())
+    if relative:
+        center = (
+            pd.Series(predicted, index=validation.index)
+            .groupby(validation["date"]).transform("mean").to_numpy()
+        )
+    else:
+        center = baseline
+    residual = predicted - center
+    outcome = (validation[f"net_{horizon}"] > 0).to_numpy(dtype=float)
+    # Equal signal-day weights reduce dominance from unequal cross-section sizes.
+    weights = 1 / validation.groupby("date")["symbol"].transform("size").to_numpy()
+    numerator = np.sum(weights * residual * (outcome - baseline))
+    denominator = np.sum(weights * residual ** 2) + 1.0
+    return float(np.clip(numerator / denominator, 0.0, 1.0))
+
+
+def evaluate(
+    dataset: pd.DataFrame,
+    horizon: int,
+    *,
+    relative: bool = False,
+    held_out: set[str] | None = None,
+    long_features: bool = False,
+    validate_blend: bool = False,
+) -> list[dict]:
+    columns = LONG_FEATURES if long_features else FEATURES
     test_universe = dataset if held_out is None else dataset.loc[dataset["symbol"].isin(held_out)]
     train_universe = dataset if held_out is None else dataset.loc[~dataset["symbol"].isin(held_out)]
     if relative:
         # Same-close peer ranks. Held-out stocks never enter training ranks.
-        train_universe = train_universe.assign(**train_universe.groupby("date")[FEATURES].rank(pct=True))
-        test_universe = test_universe.assign(**test_universe.groupby("date")[FEATURES].rank(pct=True))
+        train_universe = train_universe.assign(**train_universe.groupby("date")[columns].rank(pct=True))
+        test_universe = test_universe.assign(**test_universe.groupby("date")[columns].rank(pct=True))
     exit_col, net_col = f"exit_{horizon}", f"net_{horizon}"
     results = []
     for start, quarter in test_universe.loc[test_universe["date"] >= HOLDOUT_START].groupby(
@@ -57,14 +111,15 @@ def evaluate(dataset: pd.DataFrame, horizon: int, *, relative: bool = False, hel
             continue
         # Fixed regularization and shrinkage. No holdout-driven parameter selection.
         model = make_pipeline(StandardScaler(), LogisticRegression(C=0.01, max_iter=300))
-        model.fit(train[FEATURES], truth_train)
+        model.fit(train[columns], truth_train)
         baseline = float(truth_train.mean())
-        prediction = model.predict_proba(quarter[FEATURES])[:, 1]
+        prediction = model.predict_proba(quarter[columns])[:, 1]
+        blend = validation_blend(train, columns, horizon, relative=relative) if validate_blend else 0.5
         if relative:
             daily_mean = pd.Series(prediction, index=quarter.index).groupby(quarter["date"]).transform("mean")
-            score = np.clip(baseline + 0.5 * (prediction - daily_mean.to_numpy()), 0, 1)
+            score = np.clip(baseline + blend * (prediction - daily_mean.to_numpy()), 0, 1)
         else:
-            score = 0.5 * prediction + 0.5 * baseline
+            score = blend * prediction + (1 - blend) * baseline
         truth = quarter.loc[matured, net_col] > 0
         selected = quarter.assign(score=score).sort_values(
             ["date", "score", "symbol"], ascending=[True, False, True]
@@ -73,7 +128,7 @@ def evaluate(dataset: pd.DataFrame, horizon: int, *, relative: bool = False, hel
         selected_net = selected[net_col].dropna()
         comparable = quarter.loc[quarter["date"].isin(selected.loc[selected[net_col].notna(), "date"]), net_col].dropna()
         results.append({
-            "horizon": horizon, "quarter": str(start), "status": "evaluated",
+            "horizon": horizon, "quarter": str(start), "status": "evaluated", "blend": blend,
             "train_rows": len(train), "last_train_exit": train[exit_col].max().date(),
             "matured_rows": len(truth), "scored_rows": len(quarter),
             "model_auc": roc_auc_score(truth, score[matured]) if truth.nunique() == 2 else np.nan,
@@ -92,11 +147,13 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--history-dir", type=Path, default=Path("data/history"))
     parser.add_argument("--max-symbols", type=int)
+    parser.add_argument("--validate-blend", action="store_true", help="Choose blending weight on an inner purged historical window")
+    parser.add_argument("--long-features", action="store_true", help="Compare long-range features with the original model on identical observations")
     parser.add_argument("--symbol-folds", action="store_true", help="Evaluate three disjoint held-out symbol folds")
     parser.add_argument("--relative", action="store_true", help="Evaluate the same-close peer rank model")
     parser.add_argument("--output", type=Path, default=Path("data/experiments/long_term_walkforward.csv"))
     args = parser.parse_args()
-    frames = [prepare_history(path) for path in sample_history_paths(
+    frames = [prepare_history(path, long_features=args.long_features) for path in sample_history_paths(
         list(args.history_dir.glob("*.csv")), args.max_symbols
     )]
     frames = [frame for frame in frames if not frame.empty]
@@ -110,10 +167,11 @@ def main() -> None:
     else:
         groups = [None]
     result = pd.DataFrame([
-        {"symbol_fold": fold, **row}
+        {"symbol_fold": fold, "feature_set": "long" if extended else "short", "blend_method": "validated" if args.validate_blend else "fixed", **row}
         for fold, group in enumerate(groups, 1)
         for horizon in HORIZONS
-        for row in evaluate(dataset, horizon, relative=args.relative, held_out=group)
+        for extended in ([False, True] if args.long_features else [False])
+        for row in evaluate(dataset, horizon, relative=args.relative, held_out=group, long_features=extended, validate_blend=args.validate_blend)
     ])
     if result.empty or not result["status"].eq("evaluated").any():
         raise SystemExit("No mature walk-forward folds")

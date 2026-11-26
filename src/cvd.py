@@ -28,7 +28,10 @@ def compute_cvd(
         raise ValueError("CVD requires timestamp, volume and aggressor_side")
     if trades.empty:
         return pd.DataFrame(columns=["timestamp", "session_date", "volume", "aggressor_side", "signed_volume", "cvd"])
-    frame = trades[["timestamp", "volume", "aggressor_side"]].copy()
+    columns = ["timestamp", "volume", "aggressor_side"]
+    if "accumulated_volume" in trades:
+        columns.append("accumulated_volume")
+    frame = trades[columns].copy()
     # Require timezone-aware timestamps to avoid ambiguous exchange sessions.
     try:
         raw_times = pd.to_datetime(frame["timestamp"], utc=False, errors="raise")
@@ -45,6 +48,15 @@ def compute_cvd(
         raise ValueError("Unknown aggressor side; cannot calculate actual CVD")
     frame = frame.sort_values("timestamp", kind="stable").reset_index(drop=True)
     frame["session_date"] = frame["timestamp"].dt.strftime("%Y-%m-%d")
+    if "accumulated_volume" in frame:
+        total = pd.to_numeric(frame["accumulated_volume"], errors="coerce")
+        if not np.isfinite(total).all() or (total < frame["volume"]).any():
+            raise ValueError("Invalid exchange accumulated volume")
+        increments = total.groupby(frame["session_date"]).diff()
+        repeated = frame["session_date"].duplicated()
+        if not np.array_equal(increments.loc[repeated].to_numpy(), frame.loc[repeated, "volume"].to_numpy()):
+            raise ValueError("Missing, duplicate or reversed executions in accumulated volume")
+        frame["accumulated_volume"] = total
     frame["signed_volume"] = frame["volume"].where(frame["aggressor_side"].eq("buy"), -frame["volume"])
     if reset_each_session:
         frame["cvd"] = frame.groupby("session_date")["signed_volume"].cumsum()

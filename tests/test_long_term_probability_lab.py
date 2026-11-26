@@ -150,3 +150,55 @@ def test_symbol_holdout_excludes_test_stocks_from_training_history():
     [result] = evaluate(dataset, 20, relative=True, held_out={"000002"})
     assert result["train_rows"] == 1000
     assert result["scored_rows"] == 3
+
+
+def test_long_range_features_have_identical_past_with_future_prices_appended(tmp_path):
+    import numpy as np
+    from src.long_term_walkforward import LONG_FEATURES, prepare_history
+
+    count = 600
+    close = 100 + np.arange(count) * 0.05 + np.sin(np.arange(count))
+    frame = pd.DataFrame({
+        "date": pd.bdate_range("2022-01-03", periods=count),
+        "open": close, "high": close + 2, "low": close - 2,
+        "close": close, "volume": 10000,
+    })
+    path = tmp_path / "000001.csv"
+    frame.iloc[:350].to_csv(path, index=False)
+    prefix = prepare_history(path, long_features=True).set_index("date")
+    frame.to_csv(path, index=False)
+    extended = prepare_history(path, long_features=True).set_index("date")
+    pd.testing.assert_frame_equal(prefix[LONG_FEATURES], extended.loc[prefix.index, LONG_FEATURES])
+    assert prefix.index.min() == frame.loc[240, "date"]
+
+
+def test_validation_blend_purges_overlapping_labels(monkeypatch):
+    import numpy as np
+    from src import long_term_walkforward as lab
+
+    count = 400
+    days = pd.bdate_range("2022-01-03", periods=count)
+    rows = pd.DataFrame({
+        "date": np.repeat(days, 20), "symbol": np.tile(np.arange(20).astype(str), count),
+        "feature": np.repeat(np.arange(count), 20),
+        "net_20": np.tile([-0.01, 0.01], count * 10),
+        "exit_20": np.repeat(days + pd.offsets.BDay(20), 20),
+    })
+    calls = []
+    class Model:
+        def fit(self, features, target):
+            calls.append(features.copy())
+        def predict_proba(self, features):
+            return np.tile([0.5, 0.5], (len(features), 1))
+    monkeypatch.setattr(lab, "make_pipeline", lambda *args: Model())
+    assert lab.validation_blend(rows, ["feature"], 20, relative=True) == 0.0
+    [trained] = calls
+    expected = rows.loc[rows["exit_20"] < days[-126], ["feature"]]
+    pd.testing.assert_frame_equal(trained, expected)
+
+
+def test_validation_blend_has_no_fit_when_history_is_too_short(monkeypatch):
+    from src import long_term_walkforward as lab
+    monkeypatch.setattr(lab, "make_pipeline", lambda *args: pytest.fail("unexpected training"))
+    assert lab.validation_blend(pd.DataFrame({"date": pd.bdate_range("2023-01-02", periods=100)}),
+                                ["feature"], 240, relative=True) == 0.0

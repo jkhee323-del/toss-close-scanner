@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -13,6 +12,7 @@ import pandas as pd
 from websockets.sync.client import connect
 
 from .cvd import compute_cvd
+from .kis_auth import websocket_approval_key
 from .kis_trades import KIS_EXECUTION_COLUMNS, normalize_kis_krx_trades
 
 TR_ID = "H0STCNT0"
@@ -71,7 +71,8 @@ def capture(ticker: str, seconds: int, approval_key: str) -> pd.DataFrame:
     raw = pd.DataFrame.from_records(records, columns=KIS_EXECUTION_COLUMNS)
     trades = normalize_kis_krx_trades(raw)
     delta = compute_cvd(trades)
-    return delta.assign(price=trades["price"], source="KIS_KRX_H0STCNT0", symbol=ticker)
+    return delta.assign(price=trades["price"], source="KIS_KRX_H0STCNT0", symbol=ticker,
+                        accumulated_volume=pd.to_numeric(raw["ACML_VOL"]))
 
 
 def main() -> None:
@@ -80,7 +81,7 @@ def main() -> None:
     parser.add_argument("--seconds", type=int, default=120)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
-    delta = capture(args.ticker, args.seconds, os.getenv("KIS_WS_APPROVAL_KEY", ""))
+    delta = capture(args.ticker, args.seconds, websocket_approval_key())
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with NamedTemporaryFile(dir=args.output.parent, delete=False) as temp:
         pending = Path(temp.name)

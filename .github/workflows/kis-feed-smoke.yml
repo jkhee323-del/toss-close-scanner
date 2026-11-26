@@ -1,0 +1,35 @@
+name: KIS read-only feed authorization
+
+on:
+  push:
+    branches: [accuracy-lab]
+    paths:
+      - "src/kis_auth.py"
+      - "src/kis_cvd_capture.py"
+      - ".github/workflows/kis-feed-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  authorize:
+    if: github.ref == 'refs/heads/accuracy-lab'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install 'requests>=2.32,<3'
+      - name: Verify provider-issued WebSocket approval
+        env:
+          KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
+          KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
+        run: |
+          python - <<'PY'
+          from src.kis_auth import websocket_approval_key
+          websocket_approval_key()
+          print("KIS issued a WebSocket approval key.")
+          PY

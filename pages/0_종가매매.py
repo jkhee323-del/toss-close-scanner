@@ -803,7 +803,7 @@ with st.expander("🧪 실제 체결 데이터 CVD (CSV 업로드 · 실험 기�
             st.error("체결 파일은 5MB 이하만 지원합니다.")
         else:
             try:
-                columns = {"timestamp", "volume", "aggressor_side", "price", *KIS_EXECUTION_COLUMNS}
+                columns = {"timestamp", "volume", "aggressor_side", "price", "accumulated_volume", *KIS_EXECUTION_COLUMNS}
                 if capture_path is not None:
                     trade_df = pd.read_csv(
                         capture_path, nrows=100_001, usecols=lambda name: name in columns | {"symbol", "source"},

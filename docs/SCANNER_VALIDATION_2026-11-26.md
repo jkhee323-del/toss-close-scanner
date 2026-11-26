@@ -38,8 +38,9 @@ Model choice across these research runs has been informed by observed test
 results, so the table remains retrospective. Overlapping holding periods,
 current-universe membership, incomplete outcomes and modest AUCs limit the
 inference. All returns deduct the existing 0.2% round-trip cost.
-When the blend is zero, equal-score selections follow the existing symbol
-code tie-break, so those selections cannot establish learned ranking skill.
+When the validated blend is zero, the model abstains from stock ranking.
+Its probabilities still enter Brier/AUC/accuracy metrics, while the trade
+selection count is zero and the return metric is unavailable.
 
 ## KIS authorization and capture integrity
 
@@ -69,3 +70,7 @@ scanner-effect attribution therefore remain pending.
 
 Local regression tests passed 142 cases. Synthetic test messages exercise
 parsing and state handling. They provide no live-feed performance evidence.
+
+The KIS authorization workflow also failed at missing app credentials on
+November 26. Both live sources require account setup before a real-data
+success can be recorded.

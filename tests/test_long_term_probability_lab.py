@@ -133,6 +133,11 @@ def test_walkforward_purges_labels_maturing_on_or_after_refit():
     assert result["matured_rows"] == 7
     assert result["top10_selected"] == 8
     assert result["top10_matured"] == 7
+    [fallback] = evaluate(dataset, 20, validate_blend=True)
+    assert fallback["ranking_abstained"]
+    assert fallback["blend"] == 0
+    assert fallback["top10_selected"] == 0
+    assert pd.isna(fallback["top10_mean_net"])
 
 
 def test_symbol_holdout_excludes_test_stocks_from_training_history():

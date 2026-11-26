@@ -124,6 +124,9 @@ def evaluate(
         selected = quarter.assign(score=score).sort_values(
             ["date", "score", "symbol"], ascending=[True, False, True]
         ).groupby("date").head(10)
+        if validate_blend and blend == 0:
+            # The fallback issues no stock-ranking signal.
+            selected = selected.iloc[:0]
         # Rank before checking whether the holding outcome is observable.
         selected_net = selected[net_col].dropna()
         comparable = quarter.loc[quarter["date"].isin(selected.loc[selected[net_col].notna(), "date"]), net_col].dropna()
@@ -136,6 +139,7 @@ def evaluate(
             "constant_brier": brier_score_loss(truth, np.full(len(truth), baseline)),
             "model_accuracy": ((score[matured] >= 0.5) == truth).mean(),
             "constant_accuracy": (truth == (baseline >= 0.5)).mean(),
+            "ranking_abstained": bool(validate_blend and blend == 0),
             "top10_selected": len(selected), "top10_matured": len(selected_net),
             "top10_hit_rate": (selected_net > 0).mean(), "top10_mean_net": selected_net.mean(),
             "universe_mean_net": comparable.mean(),

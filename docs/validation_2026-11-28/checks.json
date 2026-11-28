@@ -1,0 +1,698 @@
+{
+  "date_kst": "2026-11-28",
+  "data_base_commit": "454b46466c297883dcf8fb92925593ccc41640eb",
+  "regression_tests": {
+    "passed": 165,
+    "failed": 0,
+    "warnings": 51
+  },
+  "release_smoke": {
+    "global_history_verified": 81,
+    "global_candidates_verified": 56,
+    "kr_date": "2026-11-27",
+    "kr_symbols": 495,
+    "kr_corrupted_excluded": 4,
+    "kr_old_history_recovered": 45,
+    "long_kr_symbols": 489,
+    "long_us_symbols": 66,
+    "long_kr_date": "2026-11-27",
+    "long_us_date": "2026-11-25",
+    "tabs_verified": 4
+  },
+  "data_integrity": {
+    "base": {
+      "korea": {
+        "status": "fail",
+        "total": 499,
+        "valid": 450,
+        "minor_roundoff_rows": 207,
+        "recoverable_recent_count": 42,
+        "recoverable_recent_files": [
+          {
+            "file": "000480.csv",
+            "clean_rows": 811,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "001340.csv",
+            "clean_rows": 633,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "001390.csv",
+            "clean_rows": 791,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "001440.csv",
+            "clean_rows": 862,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "001460.csv",
+            "clean_rows": 636,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "002310.csv",
+            "clean_rows": 634,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "002900.csv",
+            "clean_rows": 858,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "003070.csv",
+            "clean_rows": 934,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "003120.csv",
+            "clean_rows": 881,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "003200.csv",
+            "clean_rows": 882,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "003620.csv",
+            "clean_rows": 381,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "003920.csv",
+            "clean_rows": 492,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "004310.csv",
+            "clean_rows": 845,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "004800.csv",
+            "clean_rows": 567,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "005010.csv",
+            "clean_rows": 1070,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "005420.csv",
+            "clean_rows": 1177,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "005440.csv",
+            "clean_rows": 886,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "005950.csv",
+            "clean_rows": 852,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "006040.csv",
+            "clean_rows": 977,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "007070.csv",
+            "clean_rows": 469,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "007340.csv",
+            "clean_rows": 522,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "009410.csv",
+            "clean_rows": 506,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "010060.csv",
+            "clean_rows": 853,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "010580.csv",
+            "clean_rows": 1030,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "012030.csv",
+            "clean_rows": 797,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "012450.csv",
+            "clean_rows": 527,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "013580.csv",
+            "clean_rows": 390,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "014830.csv",
+            "clean_rows": 977,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "016590.csv",
+            "clean_rows": 876,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "031430.csv",
+            "clean_rows": 1134,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "035510.csv",
+            "clean_rows": 1134,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "037710.csv",
+            "clean_rows": 1134,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "042700.csv",
+            "clean_rows": 1137,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "077500.csv",
+            "clean_rows": 756,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "183190.csv",
+            "clean_rows": 1137,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "278470.csv",
+            "clean_rows": 506,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "293940.csv",
+            "clean_rows": 1193,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "298690.csv",
+            "clean_rows": 1050,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "377300.csv",
+            "clean_rows": 348,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "383220.csv",
+            "clean_rows": 1132,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "457190.csv",
+            "clean_rows": 626,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "900140.csv",
+            "clean_rows": 1002,
+            "last_clean_date": "2026-11-23"
+          }
+        ],
+        "blocked_recent_count": 7,
+        "blocked_recent_files": [
+          "000650.csv",
+          "001470.csv",
+          "001570.csv",
+          "002990.csv",
+          "010780.csv",
+          "017900.csv",
+          "348950.csv"
+        ],
+        "latest": "2026-11-27",
+        "recent_share": 0.9018,
+        "lagged_count": 0,
+        "lagged_examples": [],
+        "errors": [
+          "000480.csv: invalid OHLCV numbers",
+          "000650.csv: invalid OHLCV numbers",
+          "001340.csv: invalid OHLCV numbers",
+          "001390.csv: invalid OHLCV numbers",
+          "001440.csv: invalid OHLCV numbers",
+          "001460.csv: invalid OHLCV numbers",
+          "001470.csv: invalid OHLCV numbers",
+          "001570.csv: invalid OHLCV numbers",
+          "002310.csv: invalid OHLCV numbers",
+          "002900.csv: invalid OHLCV numbers",
+          "002990.csv: invalid OHLCV numbers",
+          "003070.csv: invalid OHLCV numbers",
+          "003120.csv: invalid OHLCV numbers",
+          "003200.csv: invalid OHLCV numbers",
+          "003620.csv: invalid OHLCV numbers",
+          "003920.csv: invalid OHLCV numbers",
+          "004310.csv: invalid OHLCV numbers",
+          "004800.csv: invalid OHLCV numbers",
+          "005010.csv: invalid OHLCV numbers",
+          "005420.csv: inconsistent OHLC"
+        ],
+        "excluded_files": [
+          "000480.csv: invalid OHLCV numbers",
+          "000650.csv: invalid OHLCV numbers",
+          "001340.csv: invalid OHLCV numbers",
+          "001390.csv: invalid OHLCV numbers",
+          "001440.csv: invalid OHLCV numbers",
+          "001460.csv: invalid OHLCV numbers",
+          "001470.csv: invalid OHLCV numbers",
+          "001570.csv: invalid OHLCV numbers",
+          "002310.csv: invalid OHLCV numbers",
+          "002900.csv: invalid OHLCV numbers",
+          "002990.csv: invalid OHLCV numbers",
+          "003070.csv: invalid OHLCV numbers",
+          "003120.csv: invalid OHLCV numbers",
+          "003200.csv: invalid OHLCV numbers",
+          "003620.csv: invalid OHLCV numbers",
+          "003920.csv: invalid OHLCV numbers",
+          "004310.csv: invalid OHLCV numbers",
+          "004800.csv: invalid OHLCV numbers",
+          "005010.csv: invalid OHLCV numbers",
+          "005420.csv: inconsistent OHLC",
+          "005440.csv: invalid OHLCV numbers",
+          "005950.csv: invalid OHLCV numbers",
+          "006040.csv: invalid OHLCV numbers",
+          "007070.csv: invalid OHLCV numbers",
+          "007340.csv: invalid OHLCV numbers",
+          "009410.csv: invalid OHLCV numbers",
+          "010060.csv: invalid OHLCV numbers",
+          "010580.csv: invalid OHLCV numbers",
+          "010780.csv: invalid OHLCV numbers",
+          "012030.csv: invalid OHLCV numbers",
+          "012450.csv: invalid OHLCV numbers",
+          "013580.csv: invalid OHLCV numbers",
+          "014830.csv: invalid OHLCV numbers",
+          "016590.csv: invalid OHLCV numbers",
+          "017900.csv: invalid OHLCV numbers",
+          "031430.csv: invalid OHLCV numbers",
+          "035510.csv: invalid OHLCV numbers",
+          "037710.csv: invalid OHLCV numbers",
+          "042700.csv: invalid OHLCV numbers",
+          "077500.csv: invalid OHLCV numbers",
+          "183190.csv: invalid OHLCV numbers",
+          "278470.csv: invalid OHLCV numbers",
+          "293940.csv: inconsistent OHLC",
+          "298690.csv: invalid OHLCV numbers",
+          "348950.csv: invalid OHLCV numbers",
+          "377300.csv: invalid OHLCV numbers",
+          "383220.csv: invalid OHLCV numbers",
+          "457190.csv: invalid OHLCV numbers",
+          "900140.csv: inconsistent OHLC"
+        ],
+        "total_errors": 49
+      },
+      "global": {
+        "status": "pass",
+        "total": 81,
+        "valid": 81,
+        "minor_roundoff_rows": 0,
+        "recoverable_recent_count": 0,
+        "recoverable_recent_files": [],
+        "blocked_recent_count": 0,
+        "blocked_recent_files": [],
+        "latest": "2026-11-27",
+        "recent_share": 1.0,
+        "lagged_count": 0,
+        "lagged_examples": [],
+        "errors": [],
+        "excluded_files": [],
+        "total_errors": 0
+      }
+    },
+    "modified": {
+      "korea": {
+        "status": "fail",
+        "total": 499,
+        "valid": 450,
+        "minor_roundoff_rows": 207,
+        "recoverable_recent_count": 42,
+        "recoverable_recent_files": [
+          {
+            "file": "000480.csv",
+            "clean_rows": 811,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "001340.csv",
+            "clean_rows": 633,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "001390.csv",
+            "clean_rows": 791,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "001440.csv",
+            "clean_rows": 862,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "001460.csv",
+            "clean_rows": 636,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "002310.csv",
+            "clean_rows": 634,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "002900.csv",
+            "clean_rows": 858,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "003070.csv",
+            "clean_rows": 934,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "003120.csv",
+            "clean_rows": 881,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "003200.csv",
+            "clean_rows": 882,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "003620.csv",
+            "clean_rows": 381,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "003920.csv",
+            "clean_rows": 492,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "004310.csv",
+            "clean_rows": 845,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "004800.csv",
+            "clean_rows": 567,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "005010.csv",
+            "clean_rows": 1070,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "005420.csv",
+            "clean_rows": 1177,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "005440.csv",
+            "clean_rows": 886,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "005950.csv",
+            "clean_rows": 852,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "006040.csv",
+            "clean_rows": 977,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "007070.csv",
+            "clean_rows": 469,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "007340.csv",
+            "clean_rows": 522,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "009410.csv",
+            "clean_rows": 506,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "010060.csv",
+            "clean_rows": 853,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "010580.csv",
+            "clean_rows": 1030,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "012030.csv",
+            "clean_rows": 797,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "012450.csv",
+            "clean_rows": 527,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "013580.csv",
+            "clean_rows": 390,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "014830.csv",
+            "clean_rows": 977,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "016590.csv",
+            "clean_rows": 876,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "031430.csv",
+            "clean_rows": 1134,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "035510.csv",
+            "clean_rows": 1134,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "037710.csv",
+            "clean_rows": 1134,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "042700.csv",
+            "clean_rows": 1137,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "077500.csv",
+            "clean_rows": 756,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "183190.csv",
+            "clean_rows": 1137,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "278470.csv",
+            "clean_rows": 506,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "293940.csv",
+            "clean_rows": 1193,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "298690.csv",
+            "clean_rows": 1050,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "377300.csv",
+            "clean_rows": 348,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "383220.csv",
+            "clean_rows": 1132,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "457190.csv",
+            "clean_rows": 626,
+            "last_clean_date": "2026-11-27"
+          },
+          {
+            "file": "900140.csv",
+            "clean_rows": 1002,
+            "last_clean_date": "2026-11-23"
+          }
+        ],
+        "blocked_recent_count": 7,
+        "blocked_recent_files": [
+          "000650.csv",
+          "001470.csv",
+          "001570.csv",
+          "002990.csv",
+          "010780.csv",
+          "017900.csv",
+          "348950.csv"
+        ],
+        "latest": "2026-11-27",
+        "recent_share": 0.9018,
+        "lagged_count": 0,
+        "lagged_examples": [],
+        "errors": [
+          "000480.csv: invalid OHLCV numbers",
+          "000650.csv: invalid OHLCV numbers",
+          "001340.csv: invalid OHLCV numbers",
+          "001390.csv: invalid OHLCV numbers",
+          "001440.csv: invalid OHLCV numbers",
+          "001460.csv: invalid OHLCV numbers",
+          "001470.csv: invalid OHLCV numbers",
+          "001570.csv: invalid OHLCV numbers",
+          "002310.csv: invalid OHLCV numbers",
+          "002900.csv: invalid OHLCV numbers",
+          "002990.csv: invalid OHLCV numbers",
+          "003070.csv: invalid OHLCV numbers",
+          "003120.csv: invalid OHLCV numbers",
+          "003200.csv: invalid OHLCV numbers",
+          "003620.csv: invalid OHLCV numbers",
+          "003920.csv: invalid OHLCV numbers",
+          "004310.csv: invalid OHLCV numbers",
+          "004800.csv: invalid OHLCV numbers",
+          "005010.csv: invalid OHLCV numbers",
+          "005420.csv: inconsistent OHLC"
+        ],
+        "excluded_files": [
+          "000480.csv: invalid OHLCV numbers",
+          "000650.csv: invalid OHLCV numbers",
+          "001340.csv: invalid OHLCV numbers",
+          "001390.csv: invalid OHLCV numbers",
+          "001440.csv: invalid OHLCV numbers",
+          "001460.csv: invalid OHLCV numbers",
+          "001470.csv: invalid OHLCV numbers",
+          "001570.csv: invalid OHLCV numbers",
+          "002310.csv: invalid OHLCV numbers",
+          "002900.csv: invalid OHLCV numbers",
+          "002990.csv: invalid OHLCV numbers",
+          "003070.csv: invalid OHLCV numbers",
+          "003120.csv: invalid OHLCV numbers",
+          "003200.csv: invalid OHLCV numbers",
+          "003620.csv: invalid OHLCV numbers",
+          "003920.csv: invalid OHLCV numbers",
+          "004310.csv: invalid OHLCV numbers",
+          "004800.csv: invalid OHLCV numbers",
+          "005010.csv: invalid OHLCV numbers",
+          "005420.csv: inconsistent OHLC",
+          "005440.csv: invalid OHLCV numbers",
+          "005950.csv: invalid OHLCV numbers",
+          "006040.csv: invalid OHLCV numbers",
+          "007070.csv: invalid OHLCV numbers",
+          "007340.csv: invalid OHLCV numbers",
+          "009410.csv: invalid OHLCV numbers",
+          "010060.csv: invalid OHLCV numbers",
+          "010580.csv: invalid OHLCV numbers",
+          "010780.csv: invalid OHLCV numbers",
+          "012030.csv: invalid OHLCV numbers",
+          "012450.csv: invalid OHLCV numbers",
+          "013580.csv: invalid OHLCV numbers",
+          "014830.csv: invalid OHLCV numbers",
+          "016590.csv: invalid OHLCV numbers",
+          "017900.csv: invalid OHLCV numbers",
+          "031430.csv: invalid OHLCV numbers",
+          "035510.csv: invalid OHLCV numbers",
+          "037710.csv: invalid OHLCV numbers",
+          "042700.csv: invalid OHLCV numbers",
+          "077500.csv: invalid OHLCV numbers",
+          "183190.csv: invalid OHLCV numbers",
+          "278470.csv: invalid OHLCV numbers",
+          "293940.csv: inconsistent OHLC",
+          "298690.csv: invalid OHLCV numbers",
+          "348950.csv: invalid OHLCV numbers",
+          "377300.csv: invalid OHLCV numbers",
+          "383220.csv: invalid OHLCV numbers",
+          "457190.csv: invalid OHLCV numbers",
+          "900140.csv: inconsistent OHLC"
+        ],
+        "total_errors": 49
+      },
+      "global": {
+        "status": "pass",
+        "total": 81,
+        "valid": 81,
+        "minor_roundoff_rows": 0,
+        "recoverable_recent_count": 0,
+        "recoverable_recent_files": [],
+        "blocked_recent_count": 0,
+        "blocked_recent_files": [],
+        "latest": "2026-11-27",
+        "recent_share": 1.0,
+        "lagged_count": 0,
+        "lagged_examples": [],
+        "errors": [],
+        "excluded_files": [],
+        "total_errors": 0
+      }
+    }
+  },
+  "previous_model_ci": {
+    "run_id": 45810444264,
+    "conclusion": "success"
+  },
+  "authentication_retries": {
+    "KIS": {
+      "run_id": 45810002535,
+      "job_id": 140805617341,
+      "result": "missing KIS_APP_KEY / KIS_APP_SECRET"
+    },
+    "KRX": {
+      "run_id": 45619425357,
+      "job_id": 140805605571,
+      "result": "missing KRX_ID / KRX_PW"
+    }
+  },
+  "completion": {
+    "model": "not met",
+    "investor_flow": "not met",
+    "cvd": "not met"
+  },
+  "production_deployed": false
+}

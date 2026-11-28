@@ -133,11 +133,55 @@ def test_walkforward_purges_labels_maturing_on_or_after_refit():
     assert result["matured_rows"] == 7
     assert result["top10_selected"] == 8
     assert result["top10_matured"] == 7
+    assert result["top10_completed_days"] == 0
+    assert pd.isna(result["top10_mean_net"])
     [fallback] = evaluate(dataset, 20, validate_blend=True)
     assert fallback["ranking_abstained"]
     assert fallback["blend"] == 0
     assert fallback["top10_selected"] == 0
     assert pd.isna(fallback["top10_mean_net"])
+
+
+def test_walkforward_counts_selected_stocks_without_any_mature_outcome():
+    import numpy as np
+    from src.long_term_walkforward import evaluate
+    from src.long_term_probability_lab import FEATURES
+
+    dataset = pd.DataFrame({feature: np.linspace(-1, 1, 1010) for feature in FEATURES})
+    dataset["symbol"] = [f"{i:06}" for i in range(1010)]
+    dataset["date"] = [pd.Timestamp("2024-12-01")] * 1000 + [pd.Timestamp("2025-01-02")] * 10
+    dataset["exit_20"] = [pd.Timestamp("2024-12-31")] * 1000 + [pd.NaT] * 10
+    dataset["net_20"] = np.tile([0.01, -0.01], 505)
+    dataset.loc[1000:, "net_20"] = np.nan
+    [result] = evaluate(dataset, 20)
+    assert result["status"] == "pending"
+    assert result["top10_selected"] == 10
+    assert result["top10_excluded_days"] == 1
+    assert result["matured_rows"] == result["top10_matured"] == 0
+    for metric in ("model_brier", "model_auc", "top10_mean_net", "top10_hit_rate"):
+        assert pd.isna(result[metric])
+
+
+def test_incomplete_basket_cannot_inflate_returns_and_benchmark_dates_are_matched():
+    from src.long_term_walkforward import summarize_portfolios
+
+    days = pd.date_range("2025-01-01", periods=3)
+    selected = pd.DataFrame({
+        "date": [days[0]] * 10 + [days[1]] * 10 + [days[2]] * 10,
+        "net_20": [0.02] * 10 + [0.99] * 9 + [float("nan")] + [0.04] * 10,
+    })
+    universe = pd.concat([selected, pd.DataFrame({
+        "date": days, "net_20": [0.13, 0.88, float("nan")],
+    })], ignore_index=True)
+    result = summarize_portfolios(selected, universe, "net_20")
+    assert result["top10_signal_days"] == 3
+    assert result["top10_completed_days"] == 2
+    assert result["top10_excluded_days"] == 1
+    assert result["top10_mean_net"] == pytest.approx(0.03)
+    assert result["paired_days"] == 1
+    assert result["paired_top10_mean_net"] == pytest.approx(0.02)
+    assert result["universe_mean_net"] == pytest.approx(0.03)
+    assert result["paired_excess_net"] == pytest.approx(-0.01)
 
 
 def test_symbol_holdout_excludes_test_stocks_from_training_history():

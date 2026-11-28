@@ -23,6 +23,30 @@ LONG_FEATURES = FEATURES + [
 ]
 
 
+def summarize_portfolios(selected: pd.DataFrame, universe: pd.DataFrame, net_col: str) -> dict:
+    """Grade complete daily top-ten baskets and matched complete benchmarks.
+
+    Partial outcomes remain coverage diagnostics. They cannot contribute to
+    returns. Daily baskets overlap, so their average is not a portfolio CAGR.
+    """
+    top = selected.groupby("date")[net_col].agg(["size", "count", "mean"])
+    complete = top.loc[(top["size"] == 10) & (top["count"] == 10)]
+    completed_trades = selected.loc[selected["date"].isin(complete.index), net_col]
+    benchmark = universe.groupby("date")[net_col].agg(["size", "count", "mean"])
+    benchmark = benchmark.loc[benchmark["size"] == benchmark["count"], "mean"]
+    paired = complete[["mean"]].join(benchmark.rename("benchmark"), how="inner")
+    return {
+        "top10_selected": len(selected), "top10_matured": int(selected[net_col].notna().sum()),
+        "top10_signal_days": len(top), "top10_completed_days": len(complete),
+        "top10_excluded_days": len(top) - len(complete),
+        "top10_hit_rate": (completed_trades > 0).mean(),
+        "top10_mean_net": complete["mean"].mean(),
+        "paired_days": len(paired), "paired_top10_mean_net": paired["mean"].mean(),
+        "universe_mean_net": paired["benchmark"].mean(),
+        "paired_excess_net": (paired["mean"] - paired["benchmark"]).mean(),
+    }
+
+
 def prepare_history(path: Path, *, long_features: bool = False) -> pd.DataFrame:
     columns = LONG_FEATURES if long_features else FEATURES
     bars, valid = valid_ohlcv_rows(pd.read_csv(path))
@@ -105,7 +129,7 @@ def evaluate(
         train = train_universe.loc[(train_universe[exit_col] < boundary) & train_universe[net_col].notna()]
         truth_train = train[net_col] > 0
         matured = quarter[net_col].notna()
-        if len(train) < 1000 or truth_train.nunique() < 2 or not matured.any():
+        if len(train) < 1000 or truth_train.nunique() < 2:
             results.append({"horizon": horizon, "quarter": str(start), "status": "insufficient",
                             "train_rows": len(train), "matured_rows": int(matured.sum())})
             continue
@@ -128,21 +152,18 @@ def evaluate(
             # The fallback issues no stock-ranking signal.
             selected = selected.iloc[:0]
         # Rank before checking whether the holding outcome is observable.
-        selected_net = selected[net_col].dropna()
-        comparable = quarter.loc[quarter["date"].isin(selected.loc[selected[net_col].notna(), "date"]), net_col].dropna()
         results.append({
-            "horizon": horizon, "quarter": str(start), "status": "evaluated", "blend": blend,
+            "horizon": horizon, "quarter": str(start),
+            "status": "evaluated" if matured.any() else "pending", "blend": blend,
             "train_rows": len(train), "last_train_exit": train[exit_col].max().date(),
             "matured_rows": len(truth), "scored_rows": len(quarter),
             "model_auc": roc_auc_score(truth, score[matured]) if truth.nunique() == 2 else np.nan,
-            "model_brier": brier_score_loss(truth, score[matured]),
-            "constant_brier": brier_score_loss(truth, np.full(len(truth), baseline)),
+            "model_brier": brier_score_loss(truth, score[matured]) if len(truth) else np.nan,
+            "constant_brier": brier_score_loss(truth, np.full(len(truth), baseline)) if len(truth) else np.nan,
             "model_accuracy": ((score[matured] >= 0.5) == truth).mean(),
             "constant_accuracy": (truth == (baseline >= 0.5)).mean(),
             "ranking_abstained": bool(validate_blend and blend == 0),
-            "top10_selected": len(selected), "top10_matured": len(selected_net),
-            "top10_hit_rate": (selected_net > 0).mean(), "top10_mean_net": selected_net.mean(),
-            "universe_mean_net": comparable.mean(),
+            **summarize_portfolios(selected, quarter, net_col),
         })
     return results
 

@@ -1,6 +1,24 @@
 """KR investor flow is date-bounded and missing data is not silently zeroed."""
 import pandas as pd
+import pytest
 from src.investor_flow import latest_published_flow_date, summarize_investor_flows
+
+
+@pytest.mark.parametrize("bad", [pd.NaT, pd.Timestamp("2026-11-12"), pd.Timestamp("2026-11-30 12:00")])
+def test_invalid_calendar_cannot_disappear_when_cutoff_is_applied(tmp_path, monkeypatch, bad):
+    from src import investor_flow_refresh
+
+    dates = pd.bdate_range("2026-10-15", periods=21)
+    calendar = dates.append(pd.DatetimeIndex([bad]))
+    raw = pd.DataFrame({"기관합계": -1, "외국인합계": 2}, index=dates)
+    assert summarize_investor_flows(raw, dates[-1], expected_sessions=calendar) is None
+    monkeypatch.setattr(investor_flow_refresh, "latest_published_flow_date", lambda: dates[-1])
+    monkeypatch.setattr(investor_flow_refresh, "fetch_investor_flows", lambda *a, **kw: pytest.fail("invalid calendar reached provider"))
+    snapshot = tmp_path / "flows.json"
+    snapshot.write_text("previous snapshot")
+    with pytest.raises(ValueError, match="calendar"):
+        investor_flow_refresh.refresh(["005930"], calendar, snapshot)
+    assert snapshot.read_text() == "previous snapshot"
 
 
 def test_published_flow_cutoff():

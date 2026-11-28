@@ -9,7 +9,7 @@ from tempfile import NamedTemporaryFile
 
 import pandas as pd
 
-from .investor_flow import fetch_investor_flows, latest_published_flow_date
+from .investor_flow import fetch_investor_flows, latest_published_flow_date, validate_reference_sessions
 
 
 def refresh(tickers: list[str], sessions: pd.DatetimeIndex, output: Path) -> dict:
@@ -17,6 +17,7 @@ def refresh(tickers: list[str], sessions: pd.DatetimeIndex, output: Path) -> dic
         not re.fullmatch(r"[0-9]{6}", ticker) for ticker in tickers
     ):
         raise ValueError("Provide distinct six-digit KRX tickers")
+    sessions = validate_reference_sessions(sessions)
     cutoff = latest_published_flow_date()
     expected = sessions[sessions <= cutoff].sort_values()
     if len(expected) < 20 or expected.has_duplicates or expected.hasnans:

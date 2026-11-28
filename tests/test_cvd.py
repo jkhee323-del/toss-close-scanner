@@ -144,3 +144,44 @@ def test_saved_exchange_totals_detect_removed_and_replayed_executions():
         compute_cvd(trades.iloc[[0, 1, 1, 2, 3]])
     with pytest.raises(ValueError, match="Invalid exchange"):
         compute_cvd(trades.assign(accumulated_volume=float("inf")))
+
+
+@pytest.mark.parametrize("corruption", [None, "missing_totals", "gap", "replay", "reverse", "symbol", "source", "session", "price", "fraction"])
+def test_collector_file_validation_survives_round_trip(tmp_path, corruption):
+    from src.kis_trades import read_kis_capture
+
+    captured = pd.DataFrame({
+        "timestamp": ["2026-11-25T09:00:01+09:00", "2026-11-25T09:00:02+09:00", "2026-11-25T09:00:03+09:00"],
+        "volume": [3, 2, 4], "accumulated_volume": [103, 105, 109],
+        "aggressor_side": ["buy", "sell", "buy"], "price": [90000, 90100, 90200],
+        "symbol": "005930", "source": "KIS_KRX_H0STCNT0",
+    })
+    if corruption == "missing_totals":
+        captured = captured.drop(columns="accumulated_volume")
+    elif corruption == "gap":
+        captured = captured.drop(1)
+    elif corruption == "replay":
+        captured = captured.iloc[[0, 1, 1, 2]]
+    elif corruption == "reverse":
+        captured = captured.iloc[::-1]
+    elif corruption == "symbol":
+        captured.loc[1, "symbol"] = "000660"
+    elif corruption == "source":
+        captured["source"] = "OHLCV_estimate"
+    elif corruption == "session":
+        captured.loc[2, "timestamp"] = "2026-11-26T09:00:03+09:00"
+    elif corruption == "price":
+        captured = captured.assign(price=float("inf"))
+    elif corruption == "fraction":
+        captured["volume"] = captured["volume"].astype(float)
+        captured.loc[0, "volume"] = 0.5
+    path = tmp_path / "cvd-005930.csv"
+    captured.to_csv(path, index=False)
+    if corruption is not None:
+        with pytest.raises(ValueError):
+            read_kis_capture(path, "005930")
+    else:
+        result = read_kis_capture(path, "005930")
+        assert result["cvd"].tolist() == [3, 1, 5]
+        assert result["price"].tolist() == [90000, 90100, 90200]
+        assert result["symbol"].unique().tolist() == ["005930"]

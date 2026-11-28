@@ -25,7 +25,7 @@ def check_ohlcv_quality(raw: pd.DataFrame, *, rounding_tolerance: float = 1.0) -
     numeric = raw[["open", "high", "low", "close", "volume"]].apply(pd.to_numeric, errors="coerce")
     if dates.empty or dates.isna().any() or dates.duplicated().any() or not dates.is_monotonic_increasing:
         return "invalid, duplicate or unsorted dates", 0
-    if numeric.isna().any().any() or (numeric[["open", "high", "low", "close"]] <= 0).any().any() or (numeric["volume"] < 0).any():
+    if not np.isfinite(numeric).all().all() or (numeric[["open", "high", "low", "close"]] <= 0).any().any() or (numeric["volume"] < 0).any():
         return "invalid OHLCV numbers", 0
     upper = numeric[["open", "low", "close"]].max(axis=1) - numeric["high"]
     lower = numeric["low"] - numeric[["open", "high", "close"]].min(axis=1)
@@ -38,13 +38,13 @@ def check_ohlcv_quality(raw: pd.DataFrame, *, rounding_tolerance: float = 1.0) -
 def valid_ohlcv_rows(raw: pd.DataFrame, *, rounding_tolerance: float = 1.0) -> tuple[pd.DataFrame, pd.Series]:
     """Sort bars and identify invalid observations without dropping their dates."""
     cols = ["date", "open", "high", "low", "close", "volume"]
-    if not set(cols).issubset(raw.columns) or raw.empty:
+    if len(raw.columns) != len(cols) or set(raw.columns) != set(cols) or raw.empty:
         return pd.DataFrame(), pd.Series(dtype=bool)
     work = raw[cols].copy()
     work["date"] = pd.to_datetime(work["date"], errors="coerce", utc=True).dt.tz_localize(None)
     for col in cols[1:]:
         work[col] = pd.to_numeric(work[col], errors="coerce")
-    if work["date"].isna().any() or work["date"].duplicated().any():
+    if work["date"].isna().any() or work["date"].dt.normalize().duplicated().any():
         return pd.DataFrame(), pd.Series(dtype=bool)
     work = work.sort_values("date").reset_index(drop=True)
     prices = work[cols[1:]]

@@ -1,7 +1,39 @@
 """Data integrity audit regression tests."""
 import pandas as pd
+import pytest
 
 from src.data_integrity_audit import inspect_market, check_ohlcv_quality, recent_valid_segment
+
+
+@pytest.mark.parametrize("column", ["open", "high", "low", "close", "volume"])
+def test_audit_rejects_infinite_values(tmp_path, column):
+    path = tmp_path / "005930.csv"
+    create_history(path)
+    raw = pd.read_csv(path).astype({column: float})
+    raw.loc[0, column] = float("inf")
+    assert check_ohlcv_quality(raw)[0] == "invalid OHLCV numbers"
+
+
+@pytest.mark.parametrize("corruption", ["duplicate_header", "extra_header", "same_session"])
+def test_recovery_cannot_bypass_ambiguous_daily_history(tmp_path, corruption):
+    from src.data_integrity_audit import valid_ohlcv_rows
+    from src.long_term_walkforward import prepare_history
+
+    path = tmp_path / "005930.csv"
+    create_history(path, dates=pd.bdate_range("2024-01-01", periods=300))
+    raw = pd.read_csv(path)
+    if corruption == "duplicate_header":
+        raw["close.1"] = raw["close"] * 2
+    elif corruption == "extra_header":
+        raw["another_ticker"] = "000660"
+    else:
+        raw["date"] = pd.to_datetime(raw["date"])
+        raw.loc[1, "date"] = raw.loc[0, "date"] + pd.Timedelta(hours=12)
+    raw.to_csv(path, index=False)
+    assert check_ohlcv_quality(raw)[0] is not None
+    assert valid_ohlcv_rows(raw)[0].empty
+    assert recent_valid_segment(raw, minimum_rows=1).empty
+    assert prepare_history(path).empty
 
 
 def create_history(path, *, dates=None, bad_price=False):

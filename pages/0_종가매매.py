@@ -17,7 +17,7 @@ from src.indicators import add_indicators
 from src.global_cache_validation import validate_global_candidates
 from src.market_freshness import find_stale_cached_symbols, session_notice, venue_for_country
 from src.cvd import compute_cvd, cvd_divergence
-from src.kis_trades import KIS_EXECUTION_COLUMNS, normalize_kis_krx_trades
+from src.kis_trades import KIS_EXECUTION_COLUMNS, normalize_kis_krx_trades, read_kis_capture
 from src.model import FEATURES
 from src.search import GLOBAL_SCAN_UNIVERSE, US_NAME_MAP, load_kr_listing, search_all, search_yahoo
 from src.signals import compute_scored_window, floor_to_tick, pick_signals, target_prices
@@ -805,12 +805,7 @@ with st.expander("🧪 실제 체결 데이터 CVD (CSV 업로드 · 실험 기�
             try:
                 columns = {"timestamp", "volume", "aggressor_side", "price", "accumulated_volume", *KIS_EXECUTION_COLUMNS}
                 if capture_path is not None:
-                    trade_df = pd.read_csv(
-                        capture_path, nrows=100_001, usecols=lambda name: name in columns | {"symbol", "source"},
-                        dtype={"symbol": str},
-                    )
-                    if not trade_df["symbol"].eq(sym).all() or not trade_df["source"].eq("KIS_KRX_H0STCNT0").all():
-                        raise ValueError("저장 파일의 종목 또는 데이터 공급원이 일치하지 않습니다.")
+                    trade_df = read_kis_capture(capture_path, sym)
                 else:
                     trade_df = pd.read_csv(
                         cvd_file, usecols=lambda name: name in columns, dtype=dict.fromkeys(KIS_EXECUTION_COLUMNS, str)
@@ -823,10 +818,10 @@ with st.expander("🧪 실제 체결 데이터 CVD (CSV 업로드 · 실험 기�
                 if delta_df.empty:
                     st.info("체결 데이터가 없습니다.")
                 else:
-                    if capture_path is not None:
-                        start = delta_df["timestamp"].iloc[0].strftime("%Y-%m-%d %H:%M:%S")
-                        end = delta_df["timestamp"].iloc[-1].strftime("%Y-%m-%d %H:%M:%S")
-                        st.caption(f"KIS KRX 저장 체결 · {sym} · {start} ~ {end} (한국시간)")
+                    start = delta_df["timestamp"].iloc[0].strftime("%Y-%m-%d %H:%M:%S")
+                    end = delta_df["timestamp"].iloc[-1].strftime("%Y-%m-%d %H:%M:%S")
+                    source_label = f"KIS KRX 저장 체결 · {sym}" if capture_path is not None else "사용자 업로드 · 공급원 미검증"
+                    st.caption(f"{source_label} · {start} ~ {end} (한국시간)")
                     st.metric("마지막 CVD(수량 기준)", f"{delta_df['cvd'].iloc[-1]:,.0f}")
                     cvd_chart = delta_df.groupby("timestamp", as_index=False)["cvd"].last()
                     st.line_chart(cvd_chart.set_index("timestamp")["cvd"])

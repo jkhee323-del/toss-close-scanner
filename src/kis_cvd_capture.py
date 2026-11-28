@@ -13,7 +13,7 @@ from websockets.sync.client import connect
 
 from .cvd import compute_cvd
 from .kis_auth import websocket_approval_key
-from .kis_trades import KIS_EXECUTION_COLUMNS, normalize_kis_krx_trades
+from .kis_trades import CAPTURE_SOURCE, MAX_CAPTURE_TRADES, KIS_EXECUTION_COLUMNS, normalize_kis_krx_trades
 
 TR_ID = "H0STCNT0"
 # Offsets within the provider's 46-field trade message, in CSV column order.
@@ -64,15 +64,14 @@ def capture(ticker: str, seconds: int, approval_key: str) -> pd.DataFrame:
                 if not records and record[-1] == "3":
                     continue
                 records.append(record)
-                if len(records) > 1_000_000:
-                    raise RuntimeError("KIS capture exceeded one million executions")
+                if len(records) > MAX_CAPTURE_TRADES:
+                    raise RuntimeError("KIS capture exceeded 100,000 executions; use a shorter capture window")
     if not records:
         raise RuntimeError("No signed KRX executions received")
     raw = pd.DataFrame.from_records(records, columns=KIS_EXECUTION_COLUMNS)
     trades = normalize_kis_krx_trades(raw)
     delta = compute_cvd(trades)
-    return delta.assign(price=trades["price"], source="KIS_KRX_H0STCNT0", symbol=ticker,
-                        accumulated_volume=pd.to_numeric(raw["ACML_VOL"]))
+    return delta.assign(price=trades["price"], source=CAPTURE_SOURCE, symbol=ticker)
 
 
 def main() -> None:

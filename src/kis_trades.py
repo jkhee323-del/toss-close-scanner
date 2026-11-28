@@ -1,13 +1,39 @@
 """Normalize recorded KIS KRX execution messages for CVD research."""
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
+
+from .cvd import compute_cvd
+
+MAX_CAPTURE_TRADES = 100_000
+CAPTURE_SOURCE = "KIS_KRX_H0STCNT0"
 
 KIS_EXECUTION_COLUMNS = (
     "MKSC_SHRN_ISCD", "BSOP_DATE", "STCK_CNTG_HOUR", "STCK_PRPR",
     "CNTG_VOL", "ACML_VOL", "CCLD_DVSN",
 )
+
+
+def read_kis_capture(path: Path, ticker: str) -> pd.DataFrame:
+    """Load a trusted collector file without weakening its sequence checks."""
+    columns = ["timestamp", "volume", "price", "aggressor_side", "accumulated_volume", "symbol", "source"]
+    trades = pd.read_csv(path, usecols=columns, dtype={"symbol": str}, nrows=MAX_CAPTURE_TRADES + 1)
+    if trades.empty or len(trades) > MAX_CAPTURE_TRADES:
+        raise ValueError("KIS 저장 파일은 1~100,000건의 체결 기록이어야 합니다.")
+    if not trades["symbol"].eq(ticker).all() or not trades["source"].eq(CAPTURE_SOURCE).all():
+        raise ValueError("저장 파일의 종목 또는 데이터 공급원이 일치하지 않습니다.")
+    values = trades[["price", "volume", "accumulated_volume"]].apply(pd.to_numeric, errors="coerce")
+    if not np.isfinite(values).all().all() or (values <= 0).any().any() or (values % 1 != 0).any().any():
+        raise ValueError("KIS 저장 파일의 가격과 체결 수량은 양의 정수여야 합니다.")
+    if not pd.to_datetime(trades["timestamp"], utc=True).is_monotonic_increasing:
+        raise ValueError("KIS 저장 파일의 체결 순서가 올바르지 않습니다.")
+    delta = compute_cvd(trades)
+    if delta["session_date"].nunique() != 1:
+        raise ValueError("KIS 저장 파일은 한 거래일만 포함해야 합니다.")
+    return delta.assign(price=values["price"].to_numpy(), symbol=ticker, source=CAPTURE_SOURCE)
 
 
 def normalize_kis_krx_trades(raw: pd.DataFrame) -> pd.DataFrame:
@@ -46,4 +72,5 @@ def normalize_kis_krx_trades(raw: pd.DataFrame) -> pd.DataFrame:
         raise ValueError("KIS 누적 체결량에 누락·중복·역순 체결이 감지되었습니다.")
     return pd.DataFrame({
         "timestamp": timestamp, "volume": volume, "price": price, "aggressor_side": sides,
+        "accumulated_volume": total_volume,
     })

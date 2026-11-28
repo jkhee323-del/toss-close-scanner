@@ -11,6 +11,17 @@ import numpy as np
 import pandas as pd
 
 
+def validate_reference_sessions(sessions: pd.DatetimeIndex) -> pd.DatetimeIndex:
+    """Validate the entire daily calendar before excluding unpublished dates."""
+    if (
+        not isinstance(sessions, pd.DatetimeIndex) or sessions.empty
+        or sessions.tz is not None or sessions.hasnans or sessions.has_duplicates
+        or not sessions.equals(sessions.normalize())
+    ):
+        raise ValueError("Invalid KRX reference calendar")
+    return sessions.sort_values()
+
+
 def latest_published_flow_date(now: pd.Timestamp | None = None) -> pd.Timestamp:
     local_now = pd.Timestamp.now(tz="Asia/Seoul") if now is None else pd.Timestamp(now)
     local_now = local_now.tz_localize("Asia/Seoul") if local_now.tzinfo is None else local_now.tz_convert("Asia/Seoul")
@@ -43,6 +54,10 @@ def summarize_investor_flows(
         return None
     frame = frame.replace([np.inf, -np.inf], np.nan).dropna().sort_index()
     if expected_sessions is not None:
+        try:
+            expected_sessions = validate_reference_sessions(expected_sessions)
+        except ValueError:
+            return None
         cutoff = pd.Timestamp(end_date).normalize()
         required = expected_sessions[expected_sessions <= cutoff].sort_values()[-lookback:]
         if len(required) != lookback or required.has_duplicates or not required.isin(frame.index).all():

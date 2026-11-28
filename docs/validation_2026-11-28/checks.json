@@ -694,5 +694,44 @@
     "investor_flow": "not met",
     "cvd": "not met"
   },
-  "production_deployed": false
+  "production_deployed": false,
+  "code_commit": "7627279d0bb0f109f8016c1a8333baeecbe8db1a",
+  "github_actions": {
+    "regression": {
+      "run_id": 46089849478,
+      "conclusion": "success"
+    },
+    "scanner_smoke": {
+      "run_id": 46089849413,
+      "conclusion": "success"
+    },
+    "model_evaluation": {
+      "run_id": 46089849554,
+      "conclusion": "success"
+    },
+    "data_triage": {
+      "run_id": 46089849424,
+      "conclusion": "success"
+    },
+    "data_integrity": {
+      "run_id": 46089849457,
+      "conclusion": "failure",
+      "reason": "49 pre-existing Korean history errors"
+    },
+    "KIS_authorization": {
+      "run_id": 46089849425,
+      "conclusion": "failure",
+      "reason": "missing app credentials"
+    },
+    "KRX_refresh": {
+      "run_id": 46089849445,
+      "conclusion": "failure",
+      "reason": "missing KRX credentials"
+    }
+  },
+  "offline_cvd_page": {
+    "fixture": "synthetic signed executions",
+    "valid_capture_displayed": true,
+    "missing_cumulative_volume_rejected": true
+  }
 }

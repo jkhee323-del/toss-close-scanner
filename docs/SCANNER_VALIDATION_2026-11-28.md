@@ -109,6 +109,13 @@ KRX(`J`), NXT(`NX`), 통합(`UN`)을 구분한다. KRX 대조 시 시장 범위�
 이전 수정 `7fdf8fe`의 [GitHub 모델 평가 실행](https://github.com/jkhee323-del/toss-close-scanner/actions/runs/45810444264)도
 성공을 확인했다. 작업 성공은 모델 성능 기준 통과를 뜻하지 않는다.
 
+최종 코드 `7627279`에서도 [회귀 테스트](https://github.com/jkhee323-del/toss-close-scanner/actions/runs/46089849478),
+[스캐너 스모크](https://github.com/jkhee323-del/toss-close-scanner/actions/runs/46089849413),
+[모델 평가 실행](https://github.com/jkhee323-del/toss-close-scanner/actions/runs/46089849554)이
+모두 성공했다. 로컬 Streamlit에서는 합성 체결 파일의 CVD 표시와 누적 체결량 열을
+제거한 파일의 거부를 확인했다. 이는 실제 공급원 연결 확인이 아니다.
+같은 커밋의 데이터 무결성 검사와 KRX·KIS 접근 검사는 위와 같은 원인으로 실패했다.
+
 가격 전체 이력 검사는 기존 국내 **49개 파일 오류** 때문에 계속 실패한다.
 수정 전·후 오류 목록은 동일하다. 해외는 통과했다.
 정상 최근 구간을 사용할 수 있는 종목이 있어도 전체 이력 검사의 실패를 감추지 않는다.
